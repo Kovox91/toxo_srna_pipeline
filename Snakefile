@@ -62,7 +62,7 @@ rule fastqc:
         "out/trimmed/{sample}_R1_001_trimmed.fq.gz"
     output:
         html = "out/fastqc/{sample}_R1_001_trimmed_fastqc.html"
-    threads: 4
+    threads: 8
     shell:
         r"""
         fastqc --threads {threads} \
@@ -130,7 +130,7 @@ rule classify_reads:
         # write UNSORTED temp BAMs from the classifier
         mito_uns  = temp("out/filtered/{sample}_mito_filtered.unsorted.bam"),
         decoy_uns = temp("out/filtered/{sample}_decoy_filtered.unsorted.bam")
-    threads: 4
+    threads: 8
     shell:
         r"""
         python scripts/classify_reads.py \
