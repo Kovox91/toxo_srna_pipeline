@@ -1,4 +1,5 @@
 in
-out
+out/*
+!out/counts
 .snakemake
 Miniconda3-latest.sh
