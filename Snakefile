@@ -74,7 +74,7 @@ rule fastqc:
 # Map against decoy
 rule map_decoy:
     input:  R1_trimmed = "out/trimmed/{sample}_R1_001_trimmed.fq.gz"
-    output: decoy_mapped = "out/mapped/{sample}_decoy_mapped.sam"
+    output: decoy_mapped = temp("out/mapped/{sample}_decoy_mapped.sam")
     params:
         index = "references/decoy/ToxoDB-68_TgondiiRH88_Genome", # ebwt basename
     threads: 8
@@ -93,7 +93,7 @@ rule genome_mapping:
     input:
         R1_trimmed = "out/trimmed/{sample}_R1_001_trimmed.fq.gz"
     output:
-        genome_mapped = "out/mapped/{sample}_mito_mapped.sam"
+        genome_mapped = temp("out/mapped/{sample}_mito_mapped.sam")
     params:
         index = "references/pseudo_genome/pseudo_genome"   # bowtie1 index basename
     threads: 8
