@@ -1,5 +1,5 @@
-Status	out/filtered/pr3-2.mito.filtered.bam
-Assigned	12624563
+Status	out/filtered/pr3-1_decoy_filtered.bam
+Assigned	330832
 Unassigned_Unmapped	0
 Unassigned_Read_Type	0
 Unassigned_Singleton	0
@@ -10,6 +10,6 @@ Unassigned_Duplicate	0
 Unassigned_MultiMapping	0
 Unassigned_Secondary	0
 Unassigned_NonSplit	0
-Unassigned_NoFeatures	31789
+Unassigned_NoFeatures	65171611
 Unassigned_Overlapping_Length	0
-Unassigned_Ambiguity	0
+Unassigned_Ambiguity	1333

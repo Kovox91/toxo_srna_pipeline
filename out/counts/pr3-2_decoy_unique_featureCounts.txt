@@ -1,5 +1,5 @@
-# Program:featureCounts v2.0.6; Command:"featureCounts" "-T" "8" "-a" "references/nucleus_apicoplast/ToxoDB-68_TgondiiRH88.gft" "-t" "exon" "-g" "gene_id" "-s" "1" "-o" "out/counts/pr3-2.decoy.unique.featureCounts.txt" "out/filtered/pr3-2.decoy.filtered.bam" 
-Geneid	Chr	Start	End	Strand	Length	out/filtered/pr3-2.decoy.filtered.bam
+# Program:featureCounts v2.0.6; Command:"featureCounts" "-T" "8" "-a" "references/decoy/ToxoDB-68_TgondiiRH88.gft" "-t" "exon" "-g" "gene_id" "-s" "1" "-o" "out/counts/pr3-2_decoy_unique_featureCounts.txt" "out/filtered/pr3-2_decoy_filtered.bam" 
+Geneid	Chr	Start	End	Strand	Length	out/filtered/pr3-2_decoy_filtered.bam
 TGRH88_002850	CM023083;CM023083	31729;32352	32108;32484	-;-	513	0
 TGRH88_000010	CM023083;CM023083	33542;34165	33921;34297	-;-	513	0
 TGRH88_002870	CM023083;CM023083	84250;84873	84629;85005	-;-	513	0

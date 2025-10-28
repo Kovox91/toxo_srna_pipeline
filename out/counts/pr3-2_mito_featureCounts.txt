@@ -1,5 +1,5 @@
-# Program:featureCounts v2.0.6; Command:"featureCounts" "-T" "8" "-a" "references/pseudo_genome/RNA_index.gtf" "-t" "exon" "-g" "gene_id" "-s" "1" "-M" "-O" "--fraction" "-o" "out/counts/pr3-2.mito.featureCounts.txt" "out/filtered/pr3-2.mito.filtered.bam" 
-Geneid	Chr	Start	End	Strand	Length	out/filtered/pr3-2.mito.filtered.bam
+# Program:featureCounts v2.0.6; Command:"featureCounts" "-T" "8" "-a" "references/pseudo_genome/RNA_index.gtf" "-t" "exon" "-g" "gene_id" "-s" "1" "-M" "-O" "--fraction" "-o" "out/counts/pr3-2_mito_featureCounts.txt" "out/filtered/pr3-2_mito_filtered.bam" 
+Geneid	Chr	Start	End	Strand	Length	out/filtered/pr3-2_mito_filtered.bam
 RNA3	molecule1_SR*Fp*NAPIKpKO*	184	274	+	91	17223.50
 RNA39	molecule1_SR*Fp*NAPIKpKO*	278	301	+	24	5711.67
 RNA31P	molecule1_SR*Fp*NAPIKpKO*	362	426	+	65	7000.17

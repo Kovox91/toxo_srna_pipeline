@@ -9,6 +9,9 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(DESeq2)
+library(matrixStats)
+library(vegan)
+
 ```
 
 ## Normalization of sRNA seq reads
@@ -27,27 +30,162 @@ The broad idea is:
 
 ```{r load decoy count data}
 decoyCountFiles <- list.files("../out/counts",
-                        pattern = "*decoy.unique.featureCounts.txt$",
+                        pattern = "*decoy_unique_featureCounts.txt$",
                         full.names = TRUE)
 
 decoyCounts <- read.delim(decoyCountFiles[1], header = T, skip = 1) %>% 
-  select(Geneid, last_col())
+  select(Geneid, Length, last_col())
 for (file in decoyCountFiles[2:length(decoyCountFiles)]){
   counts <- read.delim(file, header = T, skip = 1) %>% 
     select(Geneid, last_col())
   decoyCounts <- left_join(decoyCounts, counts, by = "Geneid")
 }
 
-# Filter out all genes with less than 10 reads in any sample
+
+# Filter out all genes with less than 10 reads in all samples
 cleanDecoyCounts <- decoyCounts %>% 
-  filter(if_all(-Geneid, ~ .x >= 10))
+  filter(if_all(-Geneid, ~ .x >= 25),
+         Length <= 300)
+
+colnames(cleanDecoyCounts) <- base::gsub("out.filtered.",
+                                         "",
+                                         colnames(cleanDecoyCounts))
+colnames(cleanDecoyCounts) <- base::gsub("_decoy_filtered.bam",
+                                         "",
+                                         colnames(cleanDecoyCounts))
+colnames(cleanDecoyCounts) <- base::gsub("\\.",
+                                         "_",
+                                         colnames(cleanDecoyCounts))
+
   
 ```
 
 ## Investigate stable genes  
 Based on a simple, preliminary normalization and subsequent calculation of log2 fold changes, stable genes are selected from the decoy dataset: lowest 60% of absolute LFCs. alternatively filter by absolute values, depending on numbers.
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r find normalization factors}
+# 0) load metadata
+coldata <- read.csv("/home/sascha/data/Documents/toxo_pipeline_rework/samples.csv")
+ext <- cleanDecoyCounts %>% 
+  select(-Length) %>% 
+  column_to_rownames("Geneid")
+
+# ext: decoy counts matrix (features x samples), columns in same order as coldata$sample
+# coldata: data.frame with columns sample, con (factor with levels parental, pr_0, pr_1, pr_2, pr_3)
+
+coldata$con <- factor(coldata$con, levels = c("parental","pr_0","pr_1","pr_2","pr_3"))
+
+# --- 1) build dds_ext and filter low counts ---
+dds_ext <- DESeqDataSetFromMatrix(ext, coldata, design = ~ con)
+keep_ext <- rowSums(ext >= 10) >= ceiling(ncol(ext)*0.5)
+dds_ext <- dds_ext[keep_ext, ]
+
+# --- 2) provisional normalization on decoys (just to rank stability) ---
+dds_ext <- estimateSizeFactors(dds_ext, type = "poscounts")
+norm_ext <- counts(dds_ext, normalized = TRUE)  # features x samples
+
+# --- 3) compute per-group medians and a stability score (MAD across groups) ---
+# median per group for each feature
+grp_levels <- levels(coldata$con)
+m_by_grp <- sapply(grp_levels, function(g) {
+  rowMedians(norm_ext[, coldata$con == g, drop = FALSE])
+})
+# m_by_grp is features x G (G=5)
+
+# stability score: MAD across the 5 group medians (smaller = more stable)
+stab_score <- rowMads(m_by_grp)
+
+# --- 4) choose the stable subset (e.g., most stable 70%) ---
+ord <- order(stab_score, decreasing = FALSE)
+k <- round(length(ord) * 0.65)  # take central ~70% most stable
+stable_ids <- rownames(dds_ext)[ord[seq_len(k)]]
+
+# --- 5) final size factors from the stable decoys only ---
+dds_stable <- dds_ext[stable_ids, ]
+dds_stable <- estimateSizeFactors(dds_stable, type = "poscounts")
+sf_external <- sizeFactors(dds_stable)
+
+# Save sizeFactors
+base::saveRDS(sf_external,
+              "stable_decoy_size_factors.rds")
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+To Check how well the 'stable' genes are selected, we first plot PCA of the samples before and after stable-gene normalization.
+
+```{r Sanity Plots, echo=FALSE}
+# dds_ext built earlier; stable_ids selected as before
+# Recompute size factors on stable_ids (final external scaling):
+dds_stable <- dds_ext[stable_ids, ]
+dds_stable <- estimateSizeFactors(dds_stable, type = "poscounts")
+sf_ext <- sizeFactors(dds_stable)
+
+# Apply these to the full decoy object and make a VST for PCA:
+sizeFactors(dds_ext) <- sf_ext
+vsd_ext <- varianceStabilizingTransformation(dds_ext, blind = TRUE)         # or rlog if sample size is small
+M <- assay(vsd_ext)                            # features x samples
+
+# PCA on ALL decoys (sanity)
+pca_all <- prcomp(t(M), scale. = FALSE)
+ve <- round(100 * (pca_all$sdev^2 / sum(pca_all$sdev^2)), 1)
+autoplot <- function(pc, col) {
+  df <- data.frame(pc$x[,1:2], group = coldata[[col]])
+  ggplot(df, aes(PC1, PC2, color = group)) +
+    geom_point(size = 3) +
+    labs(x = paste0("PC1 (", ve[1], "%)"),
+         y = paste0("PC2 (", ve[2], "%)"),
+         title = "Decoy PCA (all decoys, external scaling)")
+}
+
+p1 <- autoplot(pca_all, "con")
+
+# PCA on **stable** decoys only (should look even flatter)
+M_stable <- M[stable_ids, , drop = FALSE]
+pca_stable <- prcomp(t(M_stable), scale. = FALSE)
+ve_s <- round(100 * (pca_stable$sdev^2 / sum(pca_stable$sdev^2)), 1)
+df_s <- data.frame(pca_stable$x[,1:2], group = coldata$con)
+p2 <- ggplot(df_s, aes(PC1, PC2, color = group)) +
+  geom_point(size = 3) +
+  labs(x = paste0("PC1 (", ve_s[1], "%)"),
+       y = paste0("PC2 (", ve_s[2], "%)"),
+       title = "Decoy PCA (stable subset only)")
+```
+
+```{r, echo=FALSE}
+p1
+```
+```{r, echo=FALSE}
+p2
+```
+
+Compare the two PCA plots, it's important, that there are no condition-based clusters. Further a wide spread over the shown principal components is expected.
+
+```{r ANOVA and PERMANOVA, echo=FALSE}
+# after making M_stable (vst of decoys, stable subset) and pca_stable
+pc <- as.data.frame(pca_stable$x[,1:5]); pc$con <- coldata$con
+anova(lm(PC1 ~ con, data=pc))
+anova(lm(PC2 ~ con, data=pc))
+
+# optional: PERMANOVA on Euclidean distances
+adonis2(dist(t(M_stable)) ~ con, data=coldata)
+```
+
+Make sure that neither PC1 nor PC2 correlate well with the experiments condition.  
+Additionally ensure that the PERMANOVA (adonis2) doesn't show a strong correlation (R2) between the euclidean distance of the samples and the condition.
+
+```{r echo=FALSE}
+rle <- t(scale(t(M_stable), center=TRUE, scale=FALSE))
+boxplot(as.data.frame(rle), outline=FALSE, main="RLE (decoy stable)")
+```
+
+Here, make sure that the Relative Log Expression of our 'stable' genes does not vary too much especially not condition based.
+
+```{r echo=FALSE}
+D <- dist(t(M_stable))
+bd <- betadisper(D, coldata$con)
+anova(bd)          # p>0.05 suggests homogeneous dispersion
+permutest(bd)      # permutation version
+plot(bd)           # quick visual check
+
+```
+
+Lastly we investigate if dispersion within treatment groups has a strong influence on the PERMANOVA readout.

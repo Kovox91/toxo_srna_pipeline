@@ -1,0 +1,88 @@
+---
+title: "DESEQ_analysis"
+author: "Sascha Maschmann"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(edgeR)
+library(tidyverse)
+```
+
+## Analysis of mito reads
+
+After finding suitable scaling factors, we use these to normalize the mito mapped reads.  
+
+```{r load data}
+countFiles <- list.files("../out/counts",
+                        pattern = "*mito_featureCounts.txt$",
+                        full.names = TRUE)
+
+mitoCounts <- read.delim(countFiles[1], header = T, skip = 1) %>% 
+  select(Geneid, last_col())
+for (file in countFiles[2:length(countFiles)]){
+  counts <- read.delim(file, header = T, skip = 1) %>% 
+    select(Geneid, last_col())
+  mitoCounts <- left_join(mitoCounts, counts, by = "Geneid")
+}
+
+
+# Filter out all genes with less than 10 reads in all samples
+cleanCounts <- mitoCounts %>% 
+  filter(if_all(-Geneid, ~ .x >= 25))
+
+colnames(cleanCounts) <- base::gsub("out.filtered.",
+                                         "",
+                                         colnames(cleanCounts))
+colnames(cleanCounts) <- base::gsub("_mito_filtered.bam",
+                                         "",
+                                         colnames(cleanCounts))
+colnames(cleanCounts) <- base::gsub("\\.",
+                                         "_",
+                                         colnames(cleanCounts))
+```
+
+```{r}
+coldata <- read.csv("/home/sascha/data/Documents/toxo_pipeline_rework/samples.csv")
+mt <- cleanCounts %>% 
+  column_to_rownames("Geneid")
+sf_stable = base::readRDS("stable_decoy_size_factors.rds")
+
+# 1) DGEList
+y <- DGEList(counts = mt)
+
+# 2) Inject external size factors as edgeR normalization factors
+# edgeR expects norm.factors to multiply library sizes; scale them to geometric mean = 1
+sf <- sf_stable
+nf <- sf / exp(mean(log(sf)))
+y$samples$norm.factors <- nf
+
+# 3) Design (add batch if you have it: ~ 0 + batch + con)
+design <- model.matrix(~ 0 + con, data = coldata)
+colnames(design) <- gsub("^con", "", colnames(design))  # nicer names
+
+# 4) Dispersion + QL fit (NO 'offset' args needed)
+y <- estimateDisp(y, design = design)
+fit <- glmQLFit(y, design = design)
+
+# 5) Test contrasts (example: pr_1 vs parental)
+library(limma)
+contr <- makeContrasts(pr_1 - parental, levels = design)
+res <- glmQLFTest(fit, contrast = contr)
+tab <- topTags(res, n = Inf)$table
+```
+
+```{r}
+# y_mt: DGEList for mt counts with the SAME norm.factors (nf) used above
+logcpm_mt <- cpm(y, log=TRUE, prior.count=1)
+norm_sum_mt <- colSums(exp(logcpm_mt))  # monotone proxy for normalized abundance
+
+df <- data.frame(con=coldata$con, norm_sum_mt=norm_sum_mt)
+ggplot(df, aes(con, norm_sum_mt)) + geom_boxplot() + geom_jitter(width=0.2, alpha=0.6) +
+  theme_bw() + ylab("Sum of normalized mt counts (proxy)") +
+  ggtitle("Global mt-rRNA abundance after external normalization")
+
+```
+
