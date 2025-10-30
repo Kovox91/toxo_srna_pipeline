@@ -7,7 +7,6 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(edgeR)
 library(tidyverse)
 ```
 
@@ -45,44 +44,122 @@ colnames(cleanCounts) <- base::gsub("\\.",
 ```
 
 ```{r}
-coldata <- read.csv("/home/sascha/data/Documents/toxo_pipeline_rework/samples.csv")
-mt <- cleanCounts %>% 
-  column_to_rownames("Geneid")
-sf_stable = base::readRDS("stable_decoy_size_factors.rds")
+testplot <- cleanCounts %>% 
+  filter(Geneid %in% c("SSUB", "RNA10", "RNA33")) %>% 
+  pivot_longer(cols = 2:16,names_to = "con") %>% 
+  mutate(con = substr(con, 1,3)) %>% 
+  group_by(Geneid, con)
+ggplot(testplot,
+       aes(x = con,
+           y = value,
+           color = Geneid)) +
+  geom_point() +
+  theme_bw() +
+  scale_y_log10() +
+  facet_wrap(~Geneid)
 
-# 1) DGEList
-y <- DGEList(counts = mt)
+```
+```{r}
+absoluteNormalizators <- base::readRDS("absolute_norm_values.RDS") %>% select(-con_b)
 
-# 2) Inject external size factors as edgeR normalization factors
-# edgeR expects norm.factors to multiply library sizes; scale them to geometric mean = 1
-sf <- sf_stable
-nf <- sf / exp(mean(log(sf)))
-y$samples$norm.factors <- nf
+relativeCounts <- cleanCounts %>% 
+  pivot_longer(cols = 2:16,
+               names_to = 'con',
+               values_to = 'reads') %>% 
+  left_join(absoluteNormalizators,
+            by="con") %>% 
+  mutate(relative_counts = reads / value,
+         con_plot = substr(con, 1,3)) %>% 
+  group_by(Geneid) %>% 
+  mutate(min = min(relative_counts),
+         max = max(relative_counts)) %>% 
+  ungroup() %>% 
+  mutate(norm_counts = (relative_counts - min) / (max - min))
 
-# 3) Design (add batch if you have it: ~ 0 + batch + con)
-design <- model.matrix(~ 0 + con, data = coldata)
-colnames(design) <- gsub("^con", "", colnames(design))  # nicer names
+GOIs = c("SSUB", "RNA10", "RNA32", "LSUF")
 
-# 4) Dispersion + QL fit (NO 'offset' args needed)
-y <- estimateDisp(y, design = design)
-fit <- glmQLFit(y, design = design)
-
-# 5) Test contrasts (example: pr_1 vs parental)
-library(limma)
-contr <- makeContrasts(pr_1 - parental, levels = design)
-res <- glmQLFTest(fit, contrast = contr)
-tab <- topTags(res, n = Inf)$table
+ggplot(filter(relativeCounts, Geneid %in% GOIs),
+       aes(x = con_plot,
+           y = norm_counts,
+           color = Geneid)) +
+  geom_point() +
+  theme_bw() +
+  facet_wrap(~Geneid, scales ="free")
+```
+```{r calculate LFCs}
+logfoldChanges <- relativeCounts %>% 
+  select(Geneid, con, norm_counts) %>% 
+  mutate(con = substr(con, 1,3)) %>% 
+  group_by(Geneid, con) %>% 
+  summarise(exp = mean(norm_counts)) %>% 
+  pivot_wider(id_cols = Geneid,
+              names_from = con,
+              values_from = exp) %>% 
+  ungroup() %>% 
+  mutate(par_pr0 = log2(pr0 / par),
+         pr0_pr1 = log2(pr1 / pr0),
+         pr0_pr2 = log2(pr2 / pr0),
+         pr0_pr3 = log2(pr3 / pr0),
+         ) %>% 
+  select(Geneid, par_pr0, pr0_pr1, pr0_pr2, pr0_pr3)
+  
 ```
 
-```{r}
-# y_mt: DGEList for mt counts with the SAME norm.factors (nf) used above
-logcpm_mt <- cpm(y, log=TRUE, prior.count=1)
-norm_sum_mt <- colSums(exp(logcpm_mt))  # monotone proxy for normalized abundance
+```{r calculate Significance}
 
-df <- data.frame(con=coldata$con, norm_sum_mt=norm_sum_mt)
-ggplot(df, aes(con, norm_sum_mt)) + geom_boxplot() + geom_jitter(width=0.2, alpha=0.6) +
-  theme_bw() + ylab("Sum of normalized mt counts (proxy)") +
-  ggtitle("Global mt-rRNA abundance after external normalization")
+genes <- unique(relativeCounts$Geneid)
 
+pvals = data.frame()
+for (gene in genes){
+  for (xy in c("par_pr0", "pr0_pr1", "pr0_pr2", "pr0_pr3")){
+    x = substr(xy, 1,3)
+    y = substr(xy,5, 7)
+    pvals[gene, xy] <- t.test(
+      filter(relativeCounts,
+             Geneid == gene,
+             con_plot == x)$norm_counts,
+      filter(relativeCounts,
+             Geneid == gene,
+             con_plot == y)$norm_counts,
+      alternative = "two.sided"
+    )[["p.value"]]
+  }
+}
+
+fdrs = data.frame(row.names = row.names(pvals))
+for (xy in c("par_pr0", "pr0_pr1", "pr0_pr2", "pr0_pr3")){
+  fdrs[, xy] <- p.adjust(pvals[,xy], method = "BH")
+}
+
+
+```
+
+```{r combine data}
+expressionData = list()
+for (gene in genes){
+  expressionData[[gene]] <- data.frame(LFC = logfoldChanges %>% 
+                                         filter(Geneid == gene) %>%
+                                         select(-Geneid) %>% 
+                                         t(),
+                                       pval = pvals %>% 
+                                         rownames_to_column("Geneid") %>% 
+                                         filter(Geneid == gene) %>%
+                                         select(-Geneid) %>% 
+                                         t(),
+                                       FDR = fdrs %>% 
+                                         rownames_to_column("Geneid") %>% 
+                                         filter(Geneid == gene) %>%
+                                         select(-Geneid) %>% 
+                                         t())
+    
+}
+
+```
+
+```{r HEatmap}
+lfc_matrix <- logfoldChanges %>% 
+  column_to_rownames("Geneid") %>% 
+  as.matrix()
+heatmap(lfc_matrix)
 ```
 
