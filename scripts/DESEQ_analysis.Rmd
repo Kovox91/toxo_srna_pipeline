@@ -19,6 +19,8 @@ countFiles <- list.files("../out/counts",
                         pattern = "*mito_featureCounts.txt$",
                         full.names = TRUE)
 
+coldata <- read.csv("../samples.csv")
+
 mitoCounts <- read.delim(countFiles[1], header = T, skip = 1) %>% 
   select(Geneid, last_col())
 for (file in countFiles[2:length(countFiles)]){
@@ -163,3 +165,136 @@ lfc_matrix <- logfoldChanges %>%
 heatmap(lfc_matrix)
 ```
 
+```{r}
+# --- Inputs you need ---
+# mitoCounts:   matrix of mito features (rows) x samples (columns), raw counts (integers OK, fractional OK)
+mitoCounts <- cleanCounts %>% mutate(Geneid = paste0(Geneid, "XX")) %>%  column_to_rownames("Geneid") 
+# group:        factor of conditions for each sample (length = ncol(mitoCounts)), e.g., c("ctrl","pert","ctrl",...)
+group <- factor(c("parental", "parental", "parental",
+                  "pr_0", "pr_0", "pr_0",
+                  "pr_1", "pr_1", "pr_1",
+                  "pr_2", "pr_2", "pr_2",
+                  "pr_3", "pr_3", "pr_3"), levels = unique(coldata$con))
+# dose_or_time: numeric vector (optional) for ordered design, same length as samples
+# anchor A_j:   numeric vector of length ncol(mitoCounts), e.g., colSums(nuclearCounts_stable)
+#               IMPORTANT: A_j must exclude mitochondrial reads; >0 in every sample
+Aj <- absoluteNormalizators$value
+
+library(edgeR)
+
+# 1) Prepare DGEList with offset-only normalization (NO TMM)
+Aj <- Aj * (1e6 / median(Aj))       # optional rescale for stability
+y  <- DGEList(mitoCounts)
+y$samples$lib.size      <- 1
+y$samples$norm.factors <- 1
+y$offset <- matrix(rep(log(Aj), each = nrow(y)), nrow = nrow(y), byrow = TRUE)
+
+# 2) Design with all groups (no intercept), pr_0 will be the baseline in contrasts
+group <- factor(group, levels = c("parental","pr_0","pr_1","pr_2","pr_3"))
+design <- model.matrix(~ 0 + group)
+colnames(design) <- levels(group)
+
+# 3) Dispersion + fit (QL pipeline)
+y  <- estimateDisp(y, design)
+fit <- glmQLFit(y, design)
+
+# 4) Define contrasts: (first) - (pr_0)
+CT <- makeContrasts(
+  par_pr0 = parental - pr_0,
+  pr0_pr1 = pr_1    - pr_0,   # logFC > 0 => pr_1 > pr_0
+  pr0_pr2 = pr_2    - pr_0,
+  pr0_pr3 = pr_3    - pr_0,
+  levels = design
+)
+
+# 5) Run tests and collect results
+run_one <- function(fit, contr_name) {
+  tt <- glmQLFTest(fit, contrast = CT[, contr_name])
+  out <- topTags(tt, n = Inf)$table
+  out$contrast <- contr_name
+  out
+}
+
+res_list <- lapply(colnames(CT), function(nm) run_one(fit, nm))
+res <- do.call(rbind, res_list)
+
+# res has logFC (relative to the anchor), PValue, FDR for each feature/bin and contrast
+# Example: write per-contrast tables
+split(res, res$contrast) |>
+  lapply(function(df) df[order(df$FDR), ]) -> by_contrast
+
+res_clean <- res %>% 
+  rownames_to_column("Geneid") %>% 
+  mutate(Geneid = sub("XX.*", "", Geneid))
+
+
+# If you prefer opposite direction (e.g., pr_0 vs parental), just flip the signs in makeContrasts.
+
+```
+
+```{r}
+library(ComplexHeatmap)
+library(circlize)
+
+
+lfc_matrix_minimal <- res_clean %>% 
+  mutate(logFC = ifelse(PValue <= 0.05 & FDR <= 0.1, logFC, NA)) %>% 
+  select(Geneid, logFC, contrast) %>% 
+  pivot_wider(id_cols = Geneid,
+              names_from = contrast,
+              values_from = logFC) %>% 
+  filter(if_any(-Geneid, ~!is.na(.x))) %>% 
+  select_if(~sum(!is.na(.)) > 0) %>% 
+  column_to_rownames("Geneid") %>% 
+  arrange(pr0_pr2, pr0_pr3) %>% 
+  as.matrix()
+
+col = colorRamp2(c(1, 0, floor(min(lfc_matrix_minimal, na.rm = TRUE))),
+                 c("red", "white", "blue"))
+heatmap_sig <- Heatmap(lfc_matrix_minimal,
+        column_title = "Significantly changed \n mito rRNA fragments",
+        cluster_columns = FALSE,
+        cluster_rows = FALSE,
+        col = col,
+        na_col = "grey20",
+        name = "LFC",
+        )
+plot(heatmap_sig)
+png(filename = "heatmap_significant_LFC.png",
+       width = 10,
+       height = 25,
+       units = "cm",
+    res = 400)
+plot(heatmap_sig)
+dev.off()
+```
+
+```{r}
+
+lfc_matrix <- res_clean %>% 
+  select(Geneid, logFC, contrast) %>% 
+  pivot_wider(id_cols = Geneid,
+              names_from = contrast,
+              values_from = logFC) %>% 
+  column_to_rownames("Geneid") %>% 
+  as.matrix()
+
+col = colorRamp2(c(ceiling(max(lfc_matrix, na.rm = TRUE)), 0, floor(min(lfc_matrix, na.rm = TRUE))),
+                 c("red", "white", "blue"))
+heatmap_all <- Heatmap(lfc_matrix,
+        column_title = "LFCs mito rRNA fragments",
+        cluster_columns = FALSE,
+        col = col,
+        na_col = "grey20",
+        name = "LFC",
+        )
+heatmap_all
+png(filename = "heatmap_all_LFC.png",
+       width = 10,
+       height = 25,
+       units = "cm",
+    res = 400)
+plot(heatmap_all)
+dev.off()
+
+```

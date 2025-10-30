@@ -33,6 +33,17 @@ decoyCountFiles <- list.files("../out/counts",
                         pattern = "*decoy_unique_featureCounts.txt$",
                         full.names = TRUE)
 
+# Filter decoy geneids to not include rRNAs
+ribosomalIDs <- read.delim("../references/nucleus_apicoplast/ToxoDB-68_TgondiiRH88.gff",
+                           skip = 64,
+                           header = F) %>% 
+  filter(V3 == "rRNA") %>% 
+  select(V9) %>% 
+  mutate(V9 = sub(".*ID=", "", V9),
+         V9 = sub("_t.*", "", V9))
+
+ribosomalIDs <- unique(ribosomalIDs$V9)
+
 decoyCounts <- read.delim(decoyCountFiles[1], header = T, skip = 1) %>% 
   select(Geneid, Length, last_col())
 for (file in decoyCountFiles[2:length(decoyCountFiles)]){
@@ -43,9 +54,9 @@ for (file in decoyCountFiles[2:length(decoyCountFiles)]){
 
 
 # Filter out all genes with less than 10 reads in all samples
-cleanDecoyCounts <- decoyCounts %>% 
-  filter(if_all(-Geneid, ~ .x >= 10),
-         Length <= 300)
+cleanDecoyCounts <- decoyCounts  %>% 
+ filter(if_all(-Geneid, ~ .x >= 10),
+        !Geneid %in% ribosomalIDs)
 
 colnames(cleanDecoyCounts) <- base::gsub("out.filtered.",
                                          "",
