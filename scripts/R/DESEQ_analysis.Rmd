@@ -330,6 +330,6 @@ png(filename = "plots/volcano_d0_d2.png",
        height = 9,
        units = "cm",
     res = 400)
-plot(heatmap_sig)
+plot(volcano_0_2)
 dev.off()
 ```
