@@ -170,7 +170,7 @@ ggplot(filter(normReads, Geneid %in% example_genes),
 
 The normalization smoothes the differences between replicates, but preserves the overall trend.
 
-```{r Heatmap all Genes, fig.height=3, fig.width=9}
+```{r Heatmap all Genes, fig.height=7, fig.width=3}
 
 lfc_matrix <- res_clean %>% 
   select(Geneid, logFC, contrast) %>% 
@@ -178,14 +178,13 @@ lfc_matrix <- res_clean %>%
               names_from = contrast,
               values_from = logFC) %>% 
   column_to_rownames("Geneid") %>% 
-  t() %>% 
   as.matrix()
 
 col = colorRamp2(c(ceiling(max(lfc_matrix, na.rm = TRUE)), 0, floor(min(lfc_matrix, na.rm = TRUE))),
                  c("red", "white", "blue"))
 heatmap_all <- Heatmap(lfc_matrix,
         column_title = "LFCs mito rRNA fragments",
-        cluster_rows = FALSE,
+        cluster_columns = FALSE,
         col = col,
         na_col = "grey20",
         name = "LFC",
@@ -194,18 +193,8 @@ plot(heatmap_all)
 ```
 
 Based on unfiltered log2fold changes, the general trend continues: over all, mito rRNA transcription presumably is dampened by the suppression of HPR4 transcription.
-```{r, results='hide'}
-png(filename = "heatmap_all_LFC.png",
-       width = 10,
-       height = 25,
-       units = "cm",
-    res = 400)
-plot(heatmap_all)
-dev.off()
 
-```
-
-```{r filtered Heatmap, fig.height=3, fig.width=9}
+```{r filtered Heatmap, fig.height=7, fig.width=3}
 p_cutoff <- 0.05
 fdr_cutoff <- 0.05
 
@@ -218,36 +207,23 @@ lfc_matrix_minimal <- res_clean %>%
   filter(if_any(-Geneid, ~!is.na(.x))) %>% 
   select_if(~sum(!is.na(.)) > 0) %>% 
   column_to_rownames("Geneid") %>% 
-  arrange(desc(pr0_pr3)) %>%
-  t() %>% 
+  arrange(pr0_pr2, pr0_pr3) %>%
   as.matrix()
 
-col = colorRamp2(c(1, 0, floor(min(lfc_matrix_minimal, na.rm = TRUE))),
+col = colorRamp2(c(2, 0, floor(min(lfc_matrix_minimal, na.rm = TRUE))),
                  c("red", "white", "blue"))
 heatmap_sig <- Heatmap(lfc_matrix_minimal,
-        column_title = "Significantly changed mito rRNA fragments",
+        column_title = "Significantly changed \n mito rRNA fragments",
         cluster_columns = FALSE,
         cluster_rows = FALSE,
         col = col,
         na_col = "grey20",
-        name = "LFC",
-        column_names_rot = 45
+        name = "LFC"
         )
 plot(heatmap_sig)
 ```
 
-When filtering based on pvalue (<=0.05) and p-adjusted (<= 0.05) only decreases in rRNA fragment expression remain.
-
-```{r, results='hide'}
-png(filename = "heatmap_significant_LFC.png",
-       width = 10,
-       height = 25,
-       units = "cm",
-    res = 400)
-plot(heatmap_sig)
-dev.off()
-```
-
+When filtering based on adjusted p value (<= 0.05) only decreases in rRNA fragment expression remain.
 
 ```{r Volcano static}
 volcano <- res_clean %>% 
@@ -258,7 +234,7 @@ volcano <- res_clean %>%
   )
 
 # Plot volcano plots
-ggplot(data = filter(volcano, contrast == "pr0_pr2"),
+volcano_0_2 <- ggplot(data = filter(volcano, contrast == "pr0_pr2"),
        aes(x = logFC,
            y = y_var)) +
   # Plot LFC against FDR
@@ -286,7 +262,11 @@ ggplot(data = filter(volcano, contrast == "pr0_pr2"),
        title = "Day 0 vs Day 2") +
   # Set theme
   theme_bw() 
+
+plot(volcano_0_2)
 ```
+
+For day 3 comparisons, the plot was made interactive, since the points are too dense for labels. Hover the Points to see the gene.
 
 ```{r Volcano interactive}
 # Due to the dense Distribution of samples, this plot is created interactively with plotly
@@ -312,8 +292,33 @@ volc1 <- ggplot(data = filter(volcano, contrast == "pr0_pr3"),
   # Set theme
   theme_bw() 
 
-suppressWarnings(ggplotly(volc1, tooltip = c("ID", "x", "y")))
+suppressWarnings(ggplotly(volc1, tooltip = c("ID")))
 
 
 ```
 
+```{r save plots, results='hide'}
+png(filename = "heatmap_all_LFC.png",
+       width = 10,
+       height = 25,
+       units = "cm",
+    res = 400)
+plot(heatmap_all)
+dev.off()
+
+png(filename = "heatmap_significant_LFC.png",
+       width = 10,
+       height = 25,
+       units = "cm",
+    res = 400)
+plot(heatmap_sig)
+dev.off()
+
+png(filename = "volcano_d0_d2.png",
+       width = 16,
+       height = 9,
+       units = "cm",
+    res = 400)
+plot(heatmap_sig)
+dev.off()
+```

@@ -33,6 +33,9 @@ decoyCountFiles <- list.files("../out/counts",
                         pattern = "*decoy_unique_featureCounts.txt$",
                         full.names = TRUE)
 
+coldata <- read.csv("../samples.csv")
+
+
 # Filter decoy geneids to not include rRNAs
 ribosomalIDs <- read.delim("../references/nucleus_apicoplast/ToxoDB-68_TgondiiRH88.gff",
                            skip = 64,
@@ -53,7 +56,7 @@ for (file in decoyCountFiles[2:length(decoyCountFiles)]){
 }
 
 
-# Filter out all genes with less than 10 reads in all samples
+# Filter out all genes with less than 10 reads in all samples and remove rRNA samples
 cleanDecoyCounts <- decoyCounts  %>% 
  filter(if_all(-Geneid, ~ .x >= 10),
         !Geneid %in% ribosomalIDs)
@@ -72,7 +75,7 @@ colnames(cleanDecoyCounts) <- base::gsub("\\.",
 ```
 
 ```{r}
-testplot3 <- cleanDecoyCounts %>% 
+absolute_norm_values <- cleanDecoyCounts %>% 
   select(-Length) %>% 
   pivot_longer(cols = 2:16,names_to = "con") %>% 
   mutate(con_b = substr(con, 1,3)) %>% 
@@ -81,14 +84,14 @@ testplot3 <- cleanDecoyCounts %>%
             con_b = con_b) %>% 
   unique()
 
-ggplot(as.data.frame(testplot3),
-       aes(x=con_b, y=value, color=con)) +geom_point()
+ggplot(as.data.frame(absolute_norm_values),
+       aes(x=con_b, y=value, color=con)) + geom_point() + theme_bw()
 
-base::saveRDS(testplot3,
+base::saveRDS(absolute_norm_values,
               "absolute_norm_values.RDS")
 ```
 
-To sanity check how stable the selected genes are, we first plot PCA of the samples before and after stable-gene normalization.
+To sanity check how stable the selected genes are, we plot PCA of the samples before and after stable-gene normalization.
 
 ```{r Sanity Plots, echo=FALSE}
 M <- cleanDecoyCounts %>% 
@@ -98,67 +101,36 @@ M <- cleanDecoyCounts %>%
   # features x samples
 
 # PCA on ALL decoys (sanity)
-pca_all <- prcomp(t(M), scale. = FALSE)
-ve <- round(100 * (pca_all$sdev^2 / sum(pca_all$sdev^2)), 1)
+pca <- prcomp(t(M), scale. = FALSE)
+ve <- round(100 * (pca$sdev^2 / sum(pca$sdev^2)), 1)
 autoplot <- function(pc, col) {
   df <- data.frame(pc$x[,1:2], group = coldata[[col]])
   ggplot(df, aes(PC1, PC2, color = group)) +
     geom_point(size = 3) +
     labs(x = paste0("PC1 (", ve[1], "%)"),
          y = paste0("PC2 (", ve[2], "%)"),
-         title = "Decoy PCA (all decoys, external scaling)")
+         title = "Decoy PCA (selected decoys)") +
+    theme_bw()
 }
 
-p1 <- autoplot(pca_all, "con")
-
-# PCA on **stable** decoys only (should look even flatter)
-M_stable <- M[stable_ids, , drop = FALSE]
-pca_stable <- prcomp(t(M_stable), scale. = FALSE)
-ve_s <- round(100 * (pca_stable$sdev^2 / sum(pca_stable$sdev^2)), 1)
-df_s <- data.frame(pca_stable$x[,1:2], group = coldata$con)
-p2 <- ggplot(df_s, aes(PC1, PC2, color = group)) +
-  geom_point(size = 3) +
-  labs(x = paste0("PC1 (", ve_s[1], "%)"),
-       y = paste0("PC2 (", ve_s[2], "%)"),
-       title = "Decoy PCA (stable subset only)")
+p1 <- autoplot(pca, "con")
 ```
 
 ```{r, echo=FALSE}
 p1
 ```
-```{r, echo=FALSE}
-p2
-```
 
-Compare the two PCA plots, it's important, that there are no condition-based clusters. Further a wide spread over the shown principal components is expected.
+It's important, that there are no condition-based clusters. Further a wide spread over the shown principal components is expected.
 
 ```{r ANOVA and PERMANOVA, echo=FALSE}
-# after making M_stable (vst of decoys, stable subset) and pca_stable
-pc <- as.data.frame(pca_stable$x[,1:5]); pc$con <- coldata$con
-anova(lm(PC1 ~ con, data=pc))
-anova(lm(PC2 ~ con, data=pc))
+# after making M (vst of decoys, stable subset) and pca
+pca <- as.data.frame(pca$x[,1:5]); pca$con <- coldata$con
+anova(lm(PC1 ~ con, data=pca))
+anova(lm(PC2 ~ con, data=pca))
 
 # optional: PERMANOVA on Euclidean distances
-adonis2(dist(t(M_stable)) ~ con, data=coldata)
+adonis2(dist(t(M)) ~ con, data=coldata)
 ```
 
 Make sure that neither PC1 nor PC2 correlate well with the experiments condition.  
 Additionally ensure that the PERMANOVA (adonis2) doesn't show a strong correlation (R2) between the euclidean distance of the samples and the condition.
-
-```{r echo=FALSE}
-rle <- t(scale(t(M_stable), center=TRUE, scale=FALSE))
-boxplot(as.data.frame(rle), outline=FALSE, main="RLE (decoy stable)")
-```
-
-Here, make sure that the Relative Log Expression of our 'stable' genes does not vary too much especially not condition based.
-
-```{r echo=FALSE}
-D <- dist(t(M_stable))
-bd <- betadisper(D, coldata$con)
-anova(bd)          # p>0.05 suggests homogeneous dispersion
-permutest(bd)      # permutation version
-plot(bd)           # quick visual check
-
-```
-
-Lastly we investigate if dispersion within treatment groups has a strong influence on the PERMANOVA readout.
