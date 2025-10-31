@@ -74,7 +74,6 @@ colnames(cleanDecoyCounts) <- base::gsub("\\.",
 ```{r}
 testplot3 <- cleanDecoyCounts %>% 
   select(-Length) %>% 
-  
   pivot_longer(cols = 2:16,names_to = "con") %>% 
   mutate(con_b = substr(con, 1,3)) %>% 
   group_by(con) %>% 
@@ -89,70 +88,14 @@ base::saveRDS(testplot3,
               "absolute_norm_values.RDS")
 ```
 
-
-## Investigate stable genes  
-Based on a simple, preliminary normalization and subsequent calculation of log2 fold changes, stable genes are selected from the decoy dataset: lowest 60% of absolute LFCs. alternatively filter by absolute values, depending on numbers.
-```{r find normalization factors}
-# 0) load metadata
-coldata <- read.csv("/home/sascha/data/Documents/toxo_pipeline_rework/samples.csv")
-ext <- cleanDecoyCounts %>% 
-  select(-Length) %>% 
-  column_to_rownames("Geneid")
-
-# ext: decoy counts matrix (features x samples), columns in same order as coldata$sample
-# coldata: data.frame with columns sample, con (factor with levels parental, pr_0, pr_1, pr_2, pr_3)
-
-coldata$con <- factor(coldata$con, levels = c("parental","pr_0","pr_1","pr_2","pr_3"))
-
-# --- 1) build dds_ext and filter low counts ---
-dds_ext <- DESeqDataSetFromMatrix(ext, coldata, design = ~ con)
-keep_ext <- rowSums(ext >= 10) >= ceiling(ncol(ext)*0.5)
-dds_ext <- dds_ext[keep_ext, ]
-
-# --- 2) provisional normalization on decoys (just to rank stability) ---
-dds_ext <- estimateSizeFactors(dds_ext, type = "poscounts")
-norm_ext <- counts(dds_ext, normalized = TRUE)  # features x samples
-
-# --- 3) compute per-group medians and a stability score (MAD across groups) ---
-# median per group for each feature
-grp_levels <- levels(coldata$con)
-m_by_grp <- sapply(grp_levels, function(g) {
-  rowMedians(norm_ext[, coldata$con == g, drop = FALSE])
-})
-# m_by_grp is features x G (G=5)
-
-# stability score: MAD across the 5 group medians (smaller = more stable)
-stab_score <- rowMads(m_by_grp)
-
-# --- 4) choose the stable subset (e.g., most stable 65%) ---
-ord <- order(stab_score, decreasing = FALSE)
-k <- round(length(ord) * 0.65)  # take central ~65% most stable
-stable_ids <- rownames(dds_ext)[ord[seq_len(k)]]
-
-# --- 5) final size factors from the stable decoys only ---
-dds_stable <- dds_ext[stable_ids, ]
-dds_stable <- estimateSizeFactors(dds_stable, type = "poscounts")
-sf_external <- sizeFactors(dds_stable)
-
-# Save sizeFactors
-base::saveRDS(sf_external,
-              "stable_decoy_size_factors.rds")
-
-```
-
-To Check how well the 'stable' genes are selected, we first plot PCA of the samples before and after stable-gene normalization.
+To sanity check how stable the selected genes are, we first plot PCA of the samples before and after stable-gene normalization.
 
 ```{r Sanity Plots, echo=FALSE}
-# dds_ext built earlier; stable_ids selected as before
-# Recompute size factors on stable_ids (final external scaling):
-dds_stable <- dds_ext[stable_ids, ]
-dds_stable <- estimateSizeFactors(dds_stable, type = "poscounts")
-sf_ext <- sizeFactors(dds_stable)
-
-# Apply these to the full decoy object and make a VST for PCA:
-sizeFactors(dds_ext) <- sf_ext
-vsd_ext <- varianceStabilizingTransformation(dds_ext, blind = TRUE)         # or rlog if sample size is small
-M <- assay(vsd_ext)                            # features x samples
+M <- cleanDecoyCounts %>% 
+  select(-Length) %>% 
+  column_to_rownames("Geneid") %>% 
+  as.matrix()
+  # features x samples
 
 # PCA on ALL decoys (sanity)
 pca_all <- prcomp(t(M), scale. = FALSE)
