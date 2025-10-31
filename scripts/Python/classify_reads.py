@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import sys, argparse, pysam
+import argparse, pysam
 from itertools import groupby
 from operator import attrgetter
 from tqdm import tqdm
