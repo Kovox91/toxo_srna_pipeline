@@ -133,7 +133,7 @@ rule classify_reads:
     threads: 4
     shell:
         r"""
-        python scripts/classify_reads.py \
+        python scripts/Python/classify_reads.py \
           --mito {input.mito} \
           --decoy {input.decoy} \
           --mito-out {output.mito_uns} \
