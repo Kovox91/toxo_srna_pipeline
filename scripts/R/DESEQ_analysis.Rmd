@@ -10,6 +10,17 @@ knitr::opts_chunk$set(echo = FALSE,
                       message = FALSE,
                       warning = FALSE,
                       fig.align = "center")
+
+packages <- c("plotly", "tidyverse", "ggrepel", "circlize")
+
+installed <- rownames(installed.packages())
+to_install <- setdiff(packages, installed)
+
+if (length(to_install) > 0) {
+  message("Installing missing packages: ", paste(to_install, collapse = ", "))
+  install.packages(to_install, repos = "https://cloud.r-project.org")
+}
+
 library(plotly)
 library(tidyverse)
 library(ggrepel)
