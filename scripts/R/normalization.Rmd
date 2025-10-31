@@ -1,0 +1,136 @@
+---
+title: "normalization"
+author: "Sascha Maschmann"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(DESeq2)
+library(matrixStats)
+library(vegan)
+
+```
+
+## Normalization of sRNA seq reads
+Reads will be normalized with size factors calculated from features located outside the mitochondria with stable detection rates throughout the experiment.  
+The broad idea is:  
+
+- QC of features
+- CPM normalize candidates
+- Calculate L2FC for all genes
+- Filter for genes that don't change with the perturbations
+- select the center 80% of features
+- Estimate size factors through DESeq2
+- Use size factors for mito read normalization
+
+#TODO - adapt file paths!
+
+```{r load decoy count data}
+decoyCountFiles <- list.files("../../out/counts",
+                        pattern = "*decoy_unique_featureCounts.txt$",
+                        full.names = TRUE)
+
+coldata <- read.csv("../../samples.csv")
+
+
+# Filter decoy geneids to not include rRNAs
+ribosomalIDs <- read.delim("../../references/nucleus_apicoplast/ToxoDB-68_TgondiiRH88.gff",
+                           skip = 64,
+                           header = F) %>% 
+  filter(V3 == "rRNA") %>% 
+  select(V9) %>% 
+  mutate(V9 = sub(".*ID=", "", V9),
+         V9 = sub("_t.*", "", V9))
+
+ribosomalIDs <- unique(ribosomalIDs$V9)
+
+decoyCounts <- read.delim(decoyCountFiles[1], header = T, skip = 1) %>% 
+  select(Geneid, Length, last_col())
+for (file in decoyCountFiles[2:length(decoyCountFiles)]){
+  counts <- read.delim(file, header = T, skip = 1) %>% 
+    select(Geneid, last_col())
+  decoyCounts <- left_join(decoyCounts, counts, by = "Geneid")
+}
+
+
+# Filter out all genes with less than 10 reads in all samples and remove rRNA samples
+cleanDecoyCounts <- decoyCounts  %>% 
+ filter(if_all(-Geneid, ~ .x >= 10),
+        !Geneid %in% ribosomalIDs)
+
+colnames(cleanDecoyCounts) <- base::gsub("out.filtered.",
+                                         "",
+                                         colnames(cleanDecoyCounts))
+colnames(cleanDecoyCounts) <- base::gsub("_decoy_filtered.bam",
+                                         "",
+                                         colnames(cleanDecoyCounts))
+colnames(cleanDecoyCounts) <- base::gsub("\\.",
+                                         "_",
+                                         colnames(cleanDecoyCounts))
+
+  
+```
+
+```{r}
+absolute_norm_values <- cleanDecoyCounts %>% 
+  select(-Length) %>% 
+  pivot_longer(cols = 2:16,names_to = "con") %>% 
+  mutate(con_b = substr(con, 1,3)) %>% 
+  group_by(con) %>% 
+  summarise(value = sum(value),
+            con_b = con_b) %>% 
+  unique()
+
+ggplot(as.data.frame(absolute_norm_values),
+       aes(x=con_b, y=value, color=con)) + geom_point() + theme_bw()
+
+base::saveRDS(absolute_norm_values,
+              "intermediates/absolute_norm_values.RDS")
+```
+
+To sanity check how stable the selected genes are, we plot PCA of the samples before and after stable-gene normalization.
+
+```{r Sanity Plots, echo=FALSE}
+M <- cleanDecoyCounts %>% 
+  select(-Length) %>% 
+  column_to_rownames("Geneid") %>% 
+  as.matrix()
+  # features x samples
+
+# PCA on ALL decoys (sanity)
+pca <- prcomp(t(M), scale. = FALSE)
+ve <- round(100 * (pca$sdev^2 / sum(pca$sdev^2)), 1)
+autoplot <- function(pc, col) {
+  df <- data.frame(pc$x[,1:2], group = coldata[[col]])
+  ggplot(df, aes(PC1, PC2, color = group)) +
+    geom_point(size = 3) +
+    labs(x = paste0("PC1 (", ve[1], "%)"),
+         y = paste0("PC2 (", ve[2], "%)"),
+         title = "Decoy PCA (selected decoys)") +
+    theme_bw()
+}
+
+p1 <- autoplot(pca, "con")
+```
+
+```{r, echo=FALSE}
+p1
+```
+
+It's important, that there are no condition-based clusters. Further a wide spread over the shown principal components is expected.
+
+```{r ANOVA and PERMANOVA, echo=FALSE}
+# after making M (vst of decoys, stable subset) and pca
+pca <- as.data.frame(pca$x[,1:5]); pca$con <- coldata$con
+anova(lm(PC1 ~ con, data=pca))
+anova(lm(PC2 ~ con, data=pca))
+
+# optional: PERMANOVA on Euclidean distances
+adonis2(dist(t(M)) ~ con, data=coldata)
+```
+
+Make sure that neither PC1 nor PC2 correlate well with the experiments condition.  
+Additionally ensure that the PERMANOVA (adonis2) doesn't show a strong correlation (R2) between the euclidean distance of the samples and the condition.
