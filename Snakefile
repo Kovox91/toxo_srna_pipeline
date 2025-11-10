@@ -181,7 +181,7 @@ rule featurecounts_mito:
           -a "references/pseudo_genome/RNA_index_rebuild.gtf" -t {params.feature} -g {params.attr} \
           -s {params.stranded} \
           -M -O --fraction \
-          --fracOverlapFeature 0.85 \
+          --fracOverlapFeature 0.9 \
           -o {output.tsv} {input.bam}
         """
 

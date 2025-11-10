@@ -71,7 +71,7 @@ colnames(cleanCounts) <- base::gsub("\\.",
 
 ```{r plot raw reads for example genes, fig.asp=9/19}
 # Set example genes throughout the document
-example_genes = c("SSUB", "RNA10-F", "RNA10-1", "RNA10-2", "RNA10", "RNA33")
+example_genes = c("SSUB", "RNA10_F", "RNA10_1", "RNA10_2", "RNA10", "RNA33", "RNA42")
 
 example_plot <- cleanCounts %>% 
   filter(Geneid %in% example_genes) %>% 
@@ -177,13 +177,14 @@ ggplot(filter(normReads, Geneid %in% example_genes),
   labs(x = "Condition",
        y = expression(log[10]("Normalized Reads")),
        title = "Normalized Reads per Condition") +
-  facet_wrap(~Geneid)
+  facet_wrap(~Geneid,
+             scales = "free_y")
 
 ```
 
 The normalization smoothes the differences between replicates, but preserves the overall trend.
 
-```{r Heatmap all Genes, fig.height=7, fig.width=3}
+```{r Heatmap all Genes, fig.height=9, fig.width=3.5}
 
 lfc_matrix <- res_clean %>% 
   select(Geneid, logFC, contrast) %>% 
@@ -207,7 +208,7 @@ plot(heatmap_all)
 
 Based on unfiltered log2fold changes, the general trend continues: over all, mito rRNA transcription presumably is dampened by the suppression of HPR4 transcription.
 
-```{r filtered Heatmap, fig.height=7, fig.width=3}
+```{r filtered Heatmap, fig.height=7.5, fig.width=3.5}
 p_cutoff <- 0.05
 fdr_cutoff <- 0.05
 
