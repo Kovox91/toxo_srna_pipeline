@@ -174,13 +174,14 @@ rule featurecounts_mito:
         sum = "out/counts/{sample}_mito_featureCounts.txt.summary"
     threads: 8
     params:
-        stranded = 1, feature = "exon", attr = "gene_id"
+        stranded = 1, feature = "rRNA", attr = "rRNA"
     shell:
         r"""
         featureCounts -T {threads} \
-          -a "references/pseudo_genome/RNA_index.gtf" -t {params.feature} -g {params.attr} \
+          -a "references/pseudo_genome/RNA_index_rebuild.gtf" -t {params.feature} -g {params.attr} \
           -s {params.stranded} \
           -M -O --fraction \
+          --fracOverlapFeature 0.85 \
           -o {output.tsv} {input.bam}
         """
 
