@@ -54,8 +54,9 @@ for (file in countFiles[2:length(countFiles)]){
 
 # Filter out all genes with less than 10 reads in all samples
 cleanCounts <- mitoCounts %>% 
-  filter(if_all(-Geneid, ~ .x >= 25),
-         Geneid != "RNA19ii")
+  filter(if_all(-Geneid, ~ .x >= 25)) %>% 
+  # Remove 'rRNA' from Geneids
+  mutate(Geneid = base::gsub(".rRNA", "", Geneid))
 
 colnames(cleanCounts) <- base::gsub("out.filtered.",
                                          "",
@@ -70,7 +71,7 @@ colnames(cleanCounts) <- base::gsub("\\.",
 
 ```{r plot raw reads for example genes, fig.asp=9/19}
 # Set example genes throughout the document
-example_genes = c("SSUB", "RNA10", "RNA33")
+example_genes = c("SSUB", "RNA10-F", "RNA10-1", "RNA10-2", "RNA10", "RNA33")
 
 example_plot <- cleanCounts %>% 
   filter(Geneid %in% example_genes) %>% 
@@ -88,7 +89,8 @@ ggplot(example_plot,
   labs(x = "Condition",
        y = expression(log[10]("Absolute Reads")),
        title = "Raw Reads per Condition") +
-  facet_wrap(~Geneid)
+  facet_wrap(~Geneid,
+             scales = "free_y")
 
 ```
 
@@ -256,7 +258,7 @@ volcano_0_2 <- ggplot(data = filter(volcano, contrast == "pr0_pr2"),
   geom_text_repel(aes(label = label),
                   segment.color = 'purple',
                   min.segment.length = .1,
-                  max.overlaps = 15,
+                  max.overlaps = 20,
                   size = 3,
                   force = 8,
                   force_pull = 0.2) +
