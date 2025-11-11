@@ -1,0 +1,74 @@
+Assuming unrestricted shared filesystem usage.
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 36
+Rules claiming more threads will be scaled down.
+Job stats:
+job                           count
+--------------------------  -------
+all                               1
+classify_reads                   17
+cutadapt_trim_all                 8
+fastqc                           13
+featurecounts_decoy_multi        18
+featurecounts_decoy_unique       17
+featurecounts_mito               18
+genome_mapping                   15
+map_decoy                        15
+sort_by_name_decoy               16
+sort_by_name_mito                15
+sort_index_decoy                 17
+sort_index_mito                  17
+total                           187
+
+Select jobs to execute...
+Execute 4 jobs...
+
+[Tue Nov 11 06:51:29 2025]
+localrule map_decoy:
+    input: out/trimmed/10_R1_001_trimmed.fq.gz
+    output: out/mapped/10_decoy_mapped.sam
+    jobid: 64
+    reason: Forced execution
+    wildcards: sample=10
+    threads: 8
+    resources: tmpdir=/tmp
+
+
+[Tue Nov 11 06:51:32 2025]
+localrule sort_by_name_decoy:
+    input: out/mapped/12_decoy_mapped.sam
+    output: out/mapped/12_decoy_mapped_sorted.bam
+    jobid: 120
+    reason: Missing output files: out/mapped/12_decoy_mapped_sorted.bam
+    wildcards: sample=12
+    threads: 8
+    resources: tmpdir=/tmp
+
+
+[Tue Nov 11 06:51:32 2025]
+localrule genome_mapping:
+    input: out/trimmed/12_R1_001_trimmed.fq.gz
+    output: out/mapped/12_mito_mapped.sam
+    jobid: 48
+    reason: Missing output files: out/mapped/12_mito_mapped.sam
+    wildcards: sample=12
+    threads: 8
+    resources: tmpdir=/tmp
+
+
+[Tue Nov 11 06:51:32 2025]
+localrule genome_mapping:
+    input: out/trimmed/13_R1_001_trimmed.fq.gz
+    output: out/mapped/13_mito_mapped.sam
+    jobid: 49
+    reason: Forced execution
+    wildcards: sample=13
+    threads: 8
+    resources: tmpdir=/tmp
+
+Setting the index via positional argument will be deprecated in a future release. Please use -x option instead.
+Setting the index via positional argument will be deprecated in a future release. Please use -x option instead.
+Setting the index via positional argument will be deprecated in a future release. Please use -x option instead.
+[E::hts_open_format] Failed to open file "out/mapped/12_decoy_mapped_sorted.bam.tmp.0000.bam" : File exists
+samtools sort: failed to create "out/mapped/12_decoy_mapped_sorted.bam.tmp.0000.bam": File exists
