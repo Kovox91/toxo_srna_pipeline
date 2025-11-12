@@ -1,3 +1,0 @@
-molecule1_SR*Fp*NAPIKpKO*
-molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*
-molecule2_JEATVDKpUB*
