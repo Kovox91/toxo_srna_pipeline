@@ -37,7 +37,7 @@ coldata <- read.csv("../../samples.csv")
 
 
 # Filter decoy geneids to not include rRNAs
-ribosomalIDs <- read.delim("../../references/nucleus_apicoplast/ToxoDB-68_TgondiiRH88.gff",
+ribosomalIDs <- read.delim("../../references/decoy/ToxoDB-68_TgondiiRH88.gff",
                            skip = 64,
                            header = F) %>% 
   filter(V3 == "rRNA") %>% 
@@ -71,6 +71,9 @@ colnames(cleanDecoyCounts) <- base::gsub("\\.",
                                          "_",
                                          colnames(cleanDecoyCounts))
 
+stableDecoyIDs <- data.frame(Geneid = base::unique(cleanDecoyCounts$Geneid))
+write_csv(stableDecoyIDs,
+          "intermediates/stable_decoy_ids.csv")
   
 ```
 
