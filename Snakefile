@@ -3,9 +3,65 @@ conda: "environment.yaml"
 
 # Import necessary modules
 import pandas as pd
+import os, subprocess, socket, getpass, time
 
 # Load configuration
 configfile: "config.yaml"
+
+# Set up Notofications
+# ---- Snakemake notifications via ntfy ----
+HOST  = socket.gethostname()
+USER  = getpass.getuser()
+START = time.time()
+
+# Configure via env vars (see below). Topic is required.
+NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "")
+NTFY_URL   = os.environ.get("NTFY_URL", "https://ntfy.sh")  # change if you self-host
+
+def _notify(title, msg, tags="snake,white_check_mark"):
+    if not NTFY_TOPIC:
+        return
+    try:
+        subprocess.run(
+            [
+                "curl","-sS",
+                "-H", f"Title: {title}",
+                "-H", "Priority: high",
+                "-H", f"Tags: {tags}",
+                "-d", msg,
+                f"{NTFY_URL.rstrip('/')}/{NTFY_TOPIC}",
+            ],
+            check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        )
+    except Exception:
+        pass  # never block the workflow on notify
+
+def _fmt_duration(sec):
+    h = int(sec // 3600); m = int((sec % 3600) // 60); s = int(sec % 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+onstart:
+    _notify(
+        "Snakemake ▶️ started",
+        f"{USER}@{HOST}\nDir: {os.getcwd()}",
+        tags="snake,play_button"
+    )
+
+onsuccess:
+    _notify(
+        "Snakemake ✅ done",
+        f"{USER}@{HOST}\nDir: {os.getcwd()}\nDuration: {_fmt_duration(time.time()-START)}",
+        tags="snake,white_check_mark"
+    )
+
+onerror:
+    _notify(
+        "Snakemake ❌ failed",
+        f"{USER}@{HOST}\nDir: {os.getcwd()}\nAfter: {_fmt_duration(time.time()-START)}\nCheck: .snakemake/log/ and run.log",
+        tags="snake,cross_mark"
+    )
+# ---- end notifications ----
+
 
 # Load sample information from CSV file
 samples_df = pd.read_csv(config['samples_csv'])
@@ -174,7 +230,7 @@ rule featurecounts_mito:
         sum = "out/counts/{sample}_mito_featureCounts.txt.summary"
     threads: 8
     params:
-        stranded = 1, feature = "rRNA", attr = "rRNA"
+        stranded = 1, feature = "rRNA", attr = "rRNA_id"
     shell:
         r"""
         featureCounts -T {threads} \
