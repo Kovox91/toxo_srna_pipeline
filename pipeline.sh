@@ -58,7 +58,7 @@ RUN_NAME=$(echo "$RUN_NAME" | tr ' /' '__')
 
 # Generate unique topic using name + random suffix
 RAND_HEX=$(openssl rand -hex 6)
-export NTFY_TOPIC="${RUN_NAME}_${RAND_HEX}"
+export NTFY_TOPIC="${RUN_NAME}"
 
 # Optional: use custom server instead of public ntfy.sh
 # export NTFY_URL="https://your.self.hosted.ntfy"
