@@ -90,9 +90,9 @@ rule all:
         decoy_bam = expand("out/filtered/{sample}_decoy_filtered.bam", sample=sample_names),
         decoy_bai = expand("out/filtered/{sample}_decoy_filtered.bam.bai", sample=sample_names),
 
-        # === Summarising .bam Files strand specific ===
-        mito_bed_plus = expand("strand_cov/{sample}_mito_filtered_plus.bedgraph", sample=sample_names),
-        mito_bed_minus = expand("strand_cov/{sample}_mito_filtered_minus.bedgraph", sample=sample_names),
+        === Summarising .bam Files strand specific ===
+        mito_bed_plus = expand("out/filtered/strand_cov/{sample}_mito_filtered_plus.bedgraph", sample=sample_names),
+        mito_bed_minus = expand("out/filtered/strand_cov/{sample}_mito_filtered_minus.bedgraph", sample=sample_names),
 
         # === Counting ===
         counts_mito_short_sense = expand("out/counts/mito/shortFeatures/sense/{sample}_mito_featureCounts.txt", sample=sample_names),
@@ -286,7 +286,7 @@ rule featurecounts_mito_long:
         sum = "out/counts/mito/longFeatures/{sample}_mito_featureCounts.txt.summary"
     threads: 8
     params:
-        stranded = 1, feature = "rRNA", attr = "rRNA_id"
+        stranded = 1, feature = "gene", attr = "gene_id"
     shell:
         r"""
         featureCounts -T {threads} \
