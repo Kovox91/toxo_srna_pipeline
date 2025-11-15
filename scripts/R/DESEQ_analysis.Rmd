@@ -400,40 +400,73 @@ plot(volcano_0_2)
 plot(volcano_0_3)
 
 ```
+### Quantification of Subunits affected
+```{r quantify unit effect}
 
-For day 3 comparisons, the plot was made interactive, since the points are too dense for labels. Hover the Points to see the gene.
-
-```{r Volcano interactive}
-# Due to the dense Distribution of samples, this plot is created interactively with plotly
-volc1 <- ggplot(data = filter(volcano, contrast == "pr0_pr3"),
-       aes(x = logFC,
-           y = y_var,
-           ID = Geneid)) +
-  # Plot LFC against FDR
-  geom_point(aes(color = color)) +
-  scale_color_identity() +
-  # Add cutoff indicators
-  geom_hline(yintercept = -log10(fdr_cutoff),
-             linetype = "dashed",
-             color = "grey40") +
-  geom_vline(xintercept = -1,
-             linetype = "dashed",
-             color = "grey40") +
-  geom_vline(xintercept = 1,
-           linetype = "dashed",
-           color = "grey40") +
-  # Adjust titles
-  labs(x = expression(log[2]("fold change")),
-       y = expression(-log[10](padj)),
-       title = "Day 0 vs Day 3") +
-  # Set theme
-  theme(legend.position = "none") +
-  theme_bw() 
-
-suppressWarnings(ggplotly(hide_legend(volc1), tooltip = c("ID")))
+unitEffect <- volcano %>% 
+  select(Geneid, FDR, logFC, contrast, unit) %>% 
+  filter(FDR <= fdr_cutoff) %>% 
+  mutate(expressed = ifelse(sign(logFC) == -1, "down", "up")) %>% 
+  group_by(contrast, expressed) %>% 
+  mutate(totalDE = n()) %>% 
+  ungroup() %>% 
+  group_by(contrast, unit, expressed) %>% 
+  summarise(relative = n() / totalDE) %>% 
+  distinct()
 
 
 ```
+
+### Compare Fragments per RNA 'identity'
+
+```{r multi fragment cases}
+
+deMultiFrag <- res_clean %>% 
+  mutate(y_var = -log10(FDR),
+         Geneid2 = Geneid,
+         Geneid = base::gsub("_.*", "", Geneid)
+  ) %>% 
+  select(Geneid, Geneid2, logFC, contrast) %>% 
+  group_by(Geneid)  %>% 
+  group_split()
+
+test <- deMultiFrag[[1]] %>% 
+  mutate(Geneid2 = ifelse(grepl("_", Geneid2), sub("^[^_]*_", "", Geneid2), "F")) %>% 
+  pivot_wider(values_from = logFC, names_from = Geneid2)
+
+untangler <- function(df){
+  df_untangled <- df %>% 
+    mutate(Geneid2 = ifelse(grepl("_", Geneid2), sub("^[^_]*_", "", Geneid2), "F")) %>% 
+    pivot_wider(values_from = logFC, names_from = Geneid2)
+  return(df_untangled)
+}
+
+
+fragTable <- lapply(deMultiFrag, untangler) %>%
+  bind_rows()
+
+trueFragmented <- fragTable %>% 
+  filter(!is.na(`1`)) %>% 
+  pivot_longer(cols = 3:5)
+
+for (id in unique(trueFragmented$Geneid)){
+  plot <- ggplot(
+    data = filter(trueFragmented, Geneid == id),
+    aes(x = contrast,
+        y = value, 
+        shape = name)
+  ) +
+    geom_point(size = 3) +
+    theme_bw() +
+    labs(x = "",
+         y = 'LFC',
+         title = id)
+  
+  plot(plot)
+}
+
+```
+
 
 ### Relative number of significantly changed rRNAs
 
