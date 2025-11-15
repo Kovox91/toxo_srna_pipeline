@@ -54,7 +54,7 @@ for (file in countFiles[2:length(countFiles)]){
 }
 
 
-# Filter out all genes with less than 10 reads in all samples
+# Filter out all genes with less than 25 reads in all samples
 cleanCounts <- mitoCounts %>% 
   filter(if_all(-Geneid, ~ .x >= 25)) %>% 
   # Remove 'rRNA' from Geneids
@@ -264,20 +264,33 @@ plot(heatmap_sig)
 When filtering based on adjusted p value (\<= 0.05) only decreases in rRNA fragment expression remain.
 
 ```{r Volcano static}
+units <- read.csv("intermediates/unit_assignment.csv")
+
 volcano <- res_clean %>% 
   select(-logCPM, -`F`) %>% 
   mutate(y_var = -log10(FDR),
          color = ifelse(FDR <= fdr_cutoff & abs(logFC) >= 1, col_fun1(logFC), "grey" ),
-         label = ifelse(PValue <= p_cutoff & FDR <= fdr_cutoff, Geneid, "")
-  )
+         label = ifelse(PValue <= p_cutoff & FDR <= fdr_cutoff, Geneid, ""),
+         Geneid2 = Geneid,
+         Geneid = base::gsub("_.*", "", Geneid)
+  ) %>% 
+  left_join(units, by = "Geneid") %>% 
+  mutate(Geneid = Geneid2,
+         unit = case_when(!is.na(unit) ~ unit,
+                          grepl("LSU", Geneid) ~ "LSU",
+                          grepl("SSU", Geneid) ~ "SSU",
+                          is.na(unit) ~ "unassigned"
+                          )) %>% 
+  select(-Geneid2)
 
 # Plot volcano plots
 volcano_0_1 <- ggplot(data = filter(volcano, contrast == "pr0_pr1"),
        aes(x = logFC,
            y = y_var)) +
   # Plot LFC against FDR
-  geom_point(aes(color = color),
-             show.legend = FALSE) +
+  geom_point(aes(color = color,
+                 shape = unit),
+             show.legend = TRUE) +
   scale_color_identity() +
   # Add labels
   geom_text_repel(aes(label = label),
@@ -309,8 +322,9 @@ volcano_0_2 <- ggplot(data = filter(volcano, contrast == "pr0_pr2"),
        aes(x = logFC,
            y = y_var)) +
   # Plot LFC against FDR
-  geom_point(aes(color = color),
-             show.legend = FALSE) +
+  geom_point(aes(color = color,
+                 shape = unit),
+             show.legend = TRUE) +
   scale_color_identity() +
   # Add labels
   geom_text_repel(aes(label = label),
@@ -341,8 +355,9 @@ volcano_0_3 <- ggplot(data = filter(volcano, contrast == "pr0_pr3"),
        aes(x = logFC,
            y = y_var)) +
   # Plot LFC against FDR
-  geom_point(aes(color = color),
-             show.legend = FALSE) +
+  geom_point(aes(color = color,
+                 shape = unit),
+             show.legend = TRUE) +
   scale_color_identity() +
   # Add labels
   geom_text_repel(aes(label = label),
