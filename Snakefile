@@ -274,7 +274,7 @@ rule featurecounts_mito_long:
     shell:
         r"""
         featureCounts -T {threads} \
-          -a "references/pseudo_genome/RNA_index_rebuild.gtf" -t {params.feature} -g {params.attr} \
+          -a "references/pseudo_genome/RNA_index_long_only.gtf" -t {params.feature} -g {params.attr} \
           -s {params.stranded} \
           --fracOverlap 0.9 \
           -o {output.tsv} {input.bam}
