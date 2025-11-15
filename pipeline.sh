@@ -65,8 +65,8 @@ export NTFY_TOPIC="${RUN_NAME}"
 
 # Show user info
 echo
-echo "✅ ntfy topic generated:  $NTFY_TOPIC"
-echo "🔗 Subscribe to:          https://ntfy.sh/$NTFY_TOPIC"
+echo "ntfy topic generated:  $NTFY_TOPIC"
+echo "Subscribe to:          https://ntfy.sh/$NTFY_TOPIC"
 echo
 echo "You can paste this link into the ntfy app or open it in a browser."
 echo
