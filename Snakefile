@@ -91,8 +91,8 @@ rule all:
         decoy_bai = expand("out/filtered/{sample}_decoy_filtered.bam.bai", sample=sample_names),
 
         # === Summarising .bam Files strand specific ===
-        mito_bed_plus
-        mito_bed_minus 
+        mito_bed_plus = expand("strand_cov/{sample}_mito_filtered_plus.bedgraph", sample=sample_names),
+        mito_bed_minus = expand("strand_cov/{sample}_mito_filtered_minus.bedgraph", sample=sample_names),
 
         # === Counting ===
         counts_mito_short_sense = expand("out/counts/mito/shortFeatures/sense/{sample}_mito_featureCounts.txt", sample=sample_names),
