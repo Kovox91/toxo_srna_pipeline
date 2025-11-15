@@ -53,10 +53,13 @@ for (file in countFiles[2:length(countFiles)]){
   mitoCounts <- left_join(mitoCounts, counts, by = "Geneid")
 }
 
+longFiles <- list.files("../../out/counts/mito/longFeatures",
+                         pattern = "*mito_featureCounts.txt$",
+                         full.names = TRUE)
 
-# Filter out all genes with less than 25 reads in all samples
-cleanCounts <- mitoCounts %>% 
-  filter(if_all(-Geneid, ~ .x >= 25)) %>% 
+# Filter out all genes with less than 20 reads in all samples
+cleanShortCounts <- mitoCounts %>% 
+  filter(if_all(-Geneid, ~ .x >= 20)) %>% 
   # Remove 'rRNA' from Geneids
   mutate(Geneid = base::gsub(".rRNA", "", Geneid)) %>% 
   pivot_longer(cols = 1:nSample+1,names_to = "sample") %>% 
@@ -68,6 +71,27 @@ cleanCounts <- mitoCounts %>%
   mutate(sample = base::gsub("\\-", "_", sample)) %>% 
   pivot_wider(names_from = sample,
               values_from = value)
+
+longCounts <- read.delim(longFiles[1], header = T, skip = 1) %>% 
+  select(Geneid, last_col())
+for (file in longFiles[2:length(longFiles)]){
+  counts <- read.delim(file, header = T, skip = 1) %>% 
+    select(Geneid, last_col())
+  longCounts <- left_join(longCounts, counts, by = "Geneid")
+}
+
+cleanLongCounts <- longCounts %>% 
+  pivot_longer(cols = 1:nSample+1,names_to = "sample") %>% 
+  mutate(sample = base::gsub("out.filtered.", "", sample),
+         sample = base::gsub("_mito_filtered.bam", "", sample),
+         sample = base::gsub("\\.", "_", sample)) %>% 
+  merge(coldata, by = "sample") %>% 
+  select(sample = sample_name, Geneid, value) %>% 
+  mutate(sample = base::gsub("\\-", "_", sample)) %>% 
+  pivot_wider(names_from = sample,
+              values_from = value)
+
+cleanCounts <- rbind(cleanShortCounts, cleanLongCounts)
 
 ```
 

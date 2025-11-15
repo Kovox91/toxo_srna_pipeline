@@ -40,7 +40,6 @@ coldata <- read.csv("../../samples.csv")
 
 # Filter decoy geneids to not include rRNAs
 ribosomalIDs <- read.delim("../../references/decoy/ToxoDB-68_TgondiiRH88.gff",
-ribosomalIDs <- read.delim("../../references/decoy/ToxoDB-68_TgondiiRH88.gff",
                            skip = 64,
                            header = F) %>% 
   filter(V3 == "rRNA") %>% 
