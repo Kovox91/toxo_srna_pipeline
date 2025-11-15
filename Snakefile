@@ -92,7 +92,8 @@ rule all:
         decoy_bai = expand("out/filtered/{sample}_decoy_filtered.bam.bai", sample=sample_names),
 
         # === Counting ===
-        counts_mito_short = expand("out/counts/mito/shortFeatures/{sample}_mito_featureCounts.txt", sample=sample_names),
+        counts_mito_short_sense = expand("out/counts/mito/shortFeatures/sense/{sample}_mito_featureCounts.txt", sample=sample_names),
+        counts_mito_short_antisense = expand("out/counts/mito/shortFeatures/antisense/{sample}_mito_featureCounts.txt", sample=sample_names),
         counts_mito_long = expand("out/counts/mito/longFeatures/{sample}_mito_featureCounts.txt", sample=sample_names),
 
         counts_decoy_unique = expand("out/counts/decoy/{sample}_decoy_unique_featureCounts.txt", sample=sample_names),
@@ -223,15 +224,34 @@ rule sort_index_decoy:
         samtools index {output.bam}
         """
 
-rule featurecounts_mito_short:
+rule featurecounts_mito_short_sense:
     input:
         bam = "out/filtered/{sample}_mito_filtered.bam"
     output:
-        tsv = "out/counts/mito/shortFeatures/{sample}_mito_featureCounts.txt",
-        sum = "out/counts/mito/shortFeatures/{sample}_mito_featureCounts.txt.summary"
+        tsv = "out/counts/mito/shortFeatures/sense/{sample}_mito_featureCounts.txt",
+        sum = "out/counts/mito/shortFeatures/sense/{sample}_mito_featureCounts.txt.summary"
     threads: 8
     params:
         stranded = 1, feature = "rRNA", attr = "rRNA_id"
+    shell:
+        r"""
+        featureCounts -T {threads} \
+          -a "references/pseudo_genome/RNA_index_rebuild.gtf" -t {params.feature} -g {params.attr} \
+          -s {params.stranded} \
+          --fracOverlapFeature 0.9 \
+          --largestOverlap \
+          -o {output.tsv} {input.bam}
+        """
+
+rule featurecounts_mito_short_antisense:
+    input:
+        bam = "out/filtered/{sample}_mito_filtered.bam"
+    output:
+        tsv = "out/counts/mito/shortFeatures/antisense/{sample}_mito_featureCounts.txt",
+        sum = "out/counts/mito/shortFeatures/antisense/{sample}_mito_featureCounts.txt.summary"
+    threads: 8
+    params:
+        stranded = 2, feature = "rRNA", attr = "rRNA_id"
     shell:
         r"""
         featureCounts -T {threads} \
