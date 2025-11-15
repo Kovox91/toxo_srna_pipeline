@@ -8,13 +8,12 @@ import os, subprocess, socket, getpass, time
 # Load configuration
 configfile: "config.yaml"
 
-# Set up Notofications
-# ---- Snakemake notifications via ntfy ----
+# Set up Notifications
 HOST  = socket.gethostname()
 USER  = getpass.getuser()
 START = time.time()
 
-# Configure via env vars (see below). Topic is required.
+# Configure via env vars.
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "")
 NTFY_URL   = os.environ.get("NTFY_URL", "https://ntfy.sh")  # change if you self-host
 
