@@ -1,9 +1,5 @@
 Status	out/filtered/12_mito_filtered.bam
-<<<<<<<< HEAD:out/counts/12_mito_featureCounts.txt.summary
-Assigned	20007608
-========
 Assigned	39626
->>>>>>>> main:out/counts/mito/shortFeatures/antisense/12_mito_featureCounts.txt.summary
 Unassigned_Unmapped	0
 Unassigned_Read_Type	0
 Unassigned_Singleton	0
@@ -14,10 +10,6 @@ Unassigned_Duplicate	0
 Unassigned_MultiMapping	0
 Unassigned_Secondary	0
 Unassigned_NonSplit	0
-<<<<<<<< HEAD:out/counts/12_mito_featureCounts.txt.summary
-Unassigned_NoFeatures	1321042
-========
 Unassigned_NoFeatures	21288840
->>>>>>>> main:out/counts/mito/shortFeatures/antisense/12_mito_featureCounts.txt.summary
 Unassigned_Overlapping_Length	0
 Unassigned_Ambiguity	184
