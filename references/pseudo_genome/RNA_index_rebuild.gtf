@@ -71,7 +71,7 @@ molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	.	rRNA	41	52	.	+	.	rRNA_id "RNA32_1"; gene_id 
 molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	.	rRNA	19	52	.	+	.	rRNA_id "RNA32_F"; gene_id "RNA32"
 molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	.	gene	55	125	.	+	.	gene_id "RNA33"
 molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	.	rRNA	55	125	.	+	.	rRNA_id "RNA33_F"; gene_id "RNA33"
-molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	.	rRNA	55	87	.	+	.	rRNA_id "RNA33_1"; gene_id "RNA33"
+molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	.	rRNA	55	78	.	+	.	rRNA_id "RNA33_1"; gene_id "RNA33"
 molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	.	rRNA	103	125	.	+	.	rRNA_id "RNA33_2"; gene_id "RNA33"
 molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	.	gene	175	195	.	-	.	gene_id "LSUC"
 molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	.	rRNA	175	195	.	-	.	rRNA_id "LSUC"; gene_id "LSUC"

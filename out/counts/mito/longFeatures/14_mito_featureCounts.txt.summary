@@ -1,5 +1,5 @@
 Status	out/filtered/14_mito_filtered.bam
-Assigned	459597
+Assigned	459949
 Unassigned_Unmapped	0
 Unassigned_Read_Type	0
 Unassigned_Singleton	0
@@ -11,5 +11,5 @@ Unassigned_MultiMapping	0
 Unassigned_Secondary	0
 Unassigned_NonSplit	0
 Unassigned_NoFeatures	29391570
-Unassigned_Overlapping_Length	51067
+Unassigned_Overlapping_Length	50715
 Unassigned_Ambiguity	0

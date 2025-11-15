@@ -1,8 +1,8 @@
-# Program:featureCounts v2.0.6; Command:"featureCounts" "-T" "8" "-a" "references/pseudo_genome/RNA_index_long_only.gtf" "-t" "gene" "-g" "gene_id" "-s" "1" "--fracOverlap" "0.9" "-o" "out/counts/mito/longFeatures/14_mito_featureCounts.txt" "out/filtered/14_mito_filtered.bam" 
+# Program:featureCounts v2.0.6; Command:"featureCounts" "-T" "8" "-a" "references/pseudo_genome/RNA_index_long_only.gtf" "-t" "gene" "-g" "gene_id" "-s" "1" "--fracOverlap" "0.8" "-o" "out/counts/mito/longFeatures/14_mito_featureCounts.txt" "out/filtered/14_mito_filtered.bam" 
 Geneid	Chr	Start	End	Strand	Length	out/filtered/14_mito_filtered.bam
-LSUA	molecule2_JEATVDKpUB*	1634	1810	+	177	287836
-cob	molecule2_JEATVDKpUB*	112	1234	+	1123	6057
-LSUDE	molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	234	515	-	282	25393
-coxIII	molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	1418	2188	-	771	7256
-coxI	molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	2132	3557	+	1426	4507
-LSUFG	molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	1212	1417	-	206	128548
+LSUA	molecule2_JEATVDKpUB*	1634	1810	+	177	287903
+cob	molecule2_JEATVDKpUB*	112	1234	+	1123	6167
+LSUDE	molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	234	515	-	282	25423
+coxIII	molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	1418	2188	-	771	7274
+coxI	molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	2132	3557	+	1426	4599
+LSUFG	molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	1212	1417	-	206	128583
