@@ -3,11 +3,12 @@ out/fastqc/*
 out/filtered/*
 out/mapped/*
 out/trimmed/*
+out/counts/*
 
 scripts/R/plots/*
 scripts/R/*.html
 *.png
-!out/counts
+
 .snakemake
 Miniconda3-latest.sh
 !*.gitkeep
