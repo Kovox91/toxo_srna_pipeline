@@ -3,7 +3,7 @@ conda: "environment.yaml"
 
 # Import necessary modules
 import pandas as pd
-import os, subprocess, socket, getpass, time, glob
+import os, subprocess, socket, getpass, time
 
 # Load configuration
 configfile: "config.yaml"
