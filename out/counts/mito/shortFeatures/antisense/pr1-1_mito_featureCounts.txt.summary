@@ -1,5 +1,5 @@
 Status	out/filtered/pr1-1_mito_filtered.bam
-Assigned	31493
+Assigned	37329
 Unassigned_Unmapped	0
 Unassigned_Read_Type	0
 Unassigned_Singleton	0
@@ -10,6 +10,6 @@ Unassigned_Duplicate	0
 Unassigned_MultiMapping	0
 Unassigned_Secondary	0
 Unassigned_NonSplit	0
-Unassigned_NoFeatures	24696246
+Unassigned_NoFeatures	24690415
 Unassigned_Overlapping_Length	0
-Unassigned_Ambiguity	5
+Unassigned_Ambiguity	0
