@@ -1,0 +1,8 @@
+# Program:featureCounts v2.0.6; Command:"featureCounts" "-T" "8" "-a" "references/pseudo_genome/RNA_index_long_only.gtf" "-t" "gene" "-g" "gene_id" "-s" "1" "--fracOverlap" "0.9" "-o" "out/counts/mito/longFeatures/17_mito_featureCounts.txt" "out/filtered/17_mito_filtered.bam" 
+Geneid	Chr	Start	End	Strand	Length	out/filtered/17_mito_filtered.bam
+LSUA	molecule2_JEATVDKpUB*	1634	1810	+	177	340814
+cob	molecule2_JEATVDKpUB*	112	1234	+	1123	5763
+LSUDE	molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	234	515	-	282	27717
+coxIII	molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	1418	2188	-	771	8655
+coxI	molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	2132	3557	+	1426	7076
+LSUFG	molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	1212	1417	-	206	64485

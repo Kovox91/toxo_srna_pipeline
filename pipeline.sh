@@ -50,13 +50,31 @@ fi
 source $(conda info --base)/etc/profile.d/conda.sh
 conda activate $ENV_NAME
 
-# (Re-) Create the necessary reference files
-cd references/pseudo_genome
-./build_index.sh
-cd ../..
+# Ask for a descriptive run name
+read -p "Enter a short name for this run (e.g. toxo_srna_seq_run1): " RUN_NAME
 
-# Run the Snakemake pipeline
-echo "Running the Snakemake pipeline..."
-snakemake --cores all
+# Sanitize name (replace spaces or slashes)
+RUN_NAME=$(echo "$RUN_NAME" | tr ' /' '__')
+
+# Generate unique topic using name + random suffix
+RAND_HEX=$(openssl rand -hex 6)
+export NTFY_TOPIC="${RUN_NAME}"
+
+# Optional: use custom server instead of public ntfy.sh
+# export NTFY_URL="https://your.self.hosted.ntfy"
+
+# Show user info
+echo
+echo "ntfy topic generated:  $NTFY_TOPIC"
+echo "Subscribe to:          https://ntfy.sh/$NTFY_TOPIC"
+echo
+echo "You can paste this link into the ntfy app or open it in a browser."
+echo
+
+# quick test (you should get a ping on your phone)
+curl -H "Title: test" -d "hello from server" "https://ntfy.sh/$NTFY_TOPIC"
+
+# run the pipeline
+snakemake -c all
 
 conda deactivate

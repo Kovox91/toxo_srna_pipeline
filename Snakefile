@@ -8,13 +8,12 @@ import os, subprocess, socket, getpass, time
 # Load configuration
 configfile: "config.yaml"
 
-# Set up Notofications
-# ---- Snakemake notifications via ntfy ----
+# Set up Notifications
 HOST  = socket.gethostname()
 USER  = getpass.getuser()
 START = time.time()
 
-# Configure via env vars (see below). Topic is required.
+# Configure via env vars.
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "")
 NTFY_URL   = os.environ.get("NTFY_URL", "https://ntfy.sh")  # change if you self-host
 
@@ -91,10 +90,16 @@ rule all:
         decoy_bam = expand("out/filtered/{sample}_decoy_filtered.bam", sample=sample_names),
         decoy_bai = expand("out/filtered/{sample}_decoy_filtered.bam.bai", sample=sample_names),
 
+        === Summarising .bam Files strand specific ===
+        mito_bed_plus = expand("out/filtered/strand_cov/{sample}_mito_filtered_plus.bedgraph", sample=sample_names),
+        mito_bed_minus = expand("out/filtered/strand_cov/{sample}_mito_filtered_minus.bedgraph", sample=sample_names),
+
         # === Counting ===
-        counts_mito = expand("out/counts/{sample}_mito_featureCounts.txt", sample=sample_names),
-        counts_decoy_unique = expand("out/counts/{sample}_decoy_unique_featureCounts.txt", sample=sample_names),
-        counts_decoy_multi = expand("out/counts/{sample}_decoy_multi_featureCounts.txt", sample=sample_names)
+        counts_mito_short_sense = expand("out/counts/mito/shortFeatures/sense/{sample}_mito_featureCounts.txt", sample=sample_names),
+        counts_mito_short_antisense = expand("out/counts/mito/shortFeatures/antisense/{sample}_mito_featureCounts.txt", sample=sample_names),
+        counts_mito_long = expand("out/counts/mito/longFeatures/{sample}_mito_featureCounts.txt", sample=sample_names),
+
+        counts_decoy = expand("out/counts/decoy/{sample}_decoy_featureCounts.txt", sample=sample_names),
 
 # Create the trim and filter rule
 rule cutadapt_trim_all:
@@ -222,12 +227,25 @@ rule sort_index_decoy:
         samtools index {output.bam}
         """
 
-rule featurecounts_mito:
+# Summarise Filtered mit .bam files by strand
+rule strand_cov:
     input:
         bam = "out/filtered/{sample}_mito_filtered.bam"
     output:
-        tsv = "out/counts/{sample}_mito_featureCounts.txt",
-        sum = "out/counts/{sample}_mito_featureCounts.txt.summary"
+        plus  = "out/filtered/strand_cov/{sample}_mito_filtered_plus.bedgraph",
+        minus = "out/filtered/strand_cov/{sample}_mito_filtered_minus.bedgraph"
+    shell:
+        """
+        bedtools genomecov -ibam {input.bam} -strand + -bg > {output.plus}
+        bedtools genomecov -ibam {input.bam} -strand - -bg > {output.minus}
+        """
+
+rule featurecounts_mito_short_sense:
+    input:
+        bam = "out/filtered/{sample}_mito_filtered.bam"
+    output:
+        tsv = "out/counts/mito/shortFeatures/sense/{sample}_mito_featureCounts.txt",
+        sum = "out/counts/mito/shortFeatures/sense/{sample}_mito_featureCounts.txt.summary"
     threads: 8
     params:
         stranded = 1, feature = "rRNA", attr = "rRNA_id"
@@ -236,33 +254,54 @@ rule featurecounts_mito:
         featureCounts -T {threads} \
           -a "references/pseudo_genome/RNA_index_rebuild.gtf" -t {params.feature} -g {params.attr} \
           -s {params.stranded} \
-          -M -O --fraction \
           --fracOverlapFeature 0.9 \
+          --largestOverlap \
           -o {output.tsv} {input.bam}
         """
 
-rule featurecounts_decoy_unique:
+rule featurecounts_mito_short_antisense:
     input:
-        bam = "out/filtered/{sample}_decoy_filtered.bam"
+        bam = "out/filtered/{sample}_mito_filtered.bam"
     output:
-        tsv = "out/counts/{sample}_decoy_unique_featureCounts.txt",
-        sum = "out/counts/{sample}_decoy_unique_featureCounts.txt.summary"
+        tsv = "out/counts/mito/shortFeatures/antisense/{sample}_mito_featureCounts.txt",
+        sum = "out/counts/mito/shortFeatures/antisense/{sample}_mito_featureCounts.txt.summary"
     threads: 8
     params:
-        stranded = 1, feature = "exon", attr = "gene_id"
+        stranded = 2, feature = "rRNA", attr = "rRNA_id"
     shell:
         r"""
         featureCounts -T {threads} \
-          -a "references/decoy/ToxoDB-68_TgondiiRH88.gft" -t {params.feature} -g {params.attr} \
+          -a "references/pseudo_genome/RNA_index_rebuild.gtf" -t {params.feature} -g {params.attr} \
           -s {params.stranded} \
+          --fracOverlapFeature 0.9 \
+          --largestOverlap \
           -o {output.tsv} {input.bam}
         """
-rule featurecounts_decoy_multi:
+
+rule featurecounts_mito_long:
+    input:
+        bam = "out/filtered/{sample}_mito_filtered.bam"
+    output:
+        tsv = "out/counts/mito/longFeatures/{sample}_mito_featureCounts.txt",
+        sum = "out/counts/mito/longFeatures/{sample}_mito_featureCounts.txt.summary"
+    threads: 8
+    params:
+        stranded = 1, feature = "gene", attr = "gene_id"
+    shell:
+        r"""
+        featureCounts -T {threads} \
+          -a "references/pseudo_genome/RNA_index_long_only.gtf" -t {params.feature} -g {params.attr} \
+          -s {params.stranded} \
+          --fracOverlap 0.9 \
+          -o {output.tsv} {input.bam}
+        """
+
+rule featurecounts_decoy:
     input:
         bam = "out/filtered/{sample}_decoy_filtered.bam"
     output:
-        tsv = "out/counts/{sample}_decoy_multi_featureCounts.txt",
-        sum = "out/counts/{sample}_decoy_multi_featureCounts.txt.summary"
+        tsv = "out/counts/decoy/{sample}_decoy_featureCounts.txt",
+        sum = "out/counts/decoy/{sample}_decoy_featureCounts.txt.summary"
     threads: 8
     params:
         stranded = 1, feature = "exon", attr = "gene_id"
@@ -271,6 +310,5 @@ rule featurecounts_decoy_multi:
         featureCounts -T {threads} \
           -a "references/decoy/ToxoDB-68_TgondiiRH88.gft" -t {params.feature} -g {params.attr} \
           -s {params.stranded} \
-          -M --fraction \
           -o {output.tsv} {input.bam}
         """

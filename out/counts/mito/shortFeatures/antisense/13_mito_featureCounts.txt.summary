@@ -1,0 +1,23 @@
+Status	out/filtered/13_mito_filtered.bam
+<<<<<<<< HEAD:out/counts/13_mito_featureCounts.txt.summary
+Assigned	32785764
+========
+Assigned	23054
+>>>>>>>> main:out/counts/mito/shortFeatures/antisense/13_mito_featureCounts.txt.summary
+Unassigned_Unmapped	0
+Unassigned_Read_Type	0
+Unassigned_Singleton	0
+Unassigned_MappingQuality	0
+Unassigned_Chimera	0
+Unassigned_FragmentLength	0
+Unassigned_Duplicate	0
+Unassigned_MultiMapping	0
+Unassigned_Secondary	0
+Unassigned_NonSplit	0
+<<<<<<<< HEAD:out/counts/13_mito_featureCounts.txt.summary
+Unassigned_NoFeatures	2577322
+========
+Unassigned_NoFeatures	35339971
+>>>>>>>> main:out/counts/mito/shortFeatures/antisense/13_mito_featureCounts.txt.summary
+Unassigned_Overlapping_Length	0
+Unassigned_Ambiguity	61

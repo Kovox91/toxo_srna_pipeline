@@ -35,7 +35,7 @@ library(edgeR)
 After finding suitable scaling genes, we use their total read numbers per sample normalize the mito mapped reads.
 
 ```{r load data}
-countFiles <- list.files("../../out/counts",
+countFiles <- list.files("../../out/counts/mito/shortFeatures/sense",
                          pattern = "*mito_featureCounts.txt$",
                          full.names = TRUE)
 

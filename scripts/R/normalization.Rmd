@@ -29,8 +29,8 @@ The broad idea is:
 #TODO - adapt file paths!
 
 ```{r load decoy count data}
-decoyCountFiles <- list.files("../../out/counts",
-                        pattern = "*decoy_unique_featureCounts.txt$",
+decoyCountFiles <- list.files("../../out/counts/decoy",
+                        pattern = "*decoy_featureCounts.txt$",
                         full.names = TRUE)
 
 nSamples <- length(decoyCountFiles)
@@ -39,6 +39,7 @@ coldata <- read.csv("../../samples.csv")
 
 
 # Filter decoy geneids to not include rRNAs
+ribosomalIDs <- read.delim("../../references/decoy/ToxoDB-68_TgondiiRH88.gff",
 ribosomalIDs <- read.delim("../../references/decoy/ToxoDB-68_TgondiiRH88.gff",
                            skip = 64,
                            header = F) %>% 
