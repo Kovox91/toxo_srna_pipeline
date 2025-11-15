@@ -1,6 +1,6 @@
 molecule2_JEATVDKpUB*	.	gene	1634	1810	.	+	.	gene_id "LSUA"
 molecule2_JEATVDKpUB*	.	gene	112	1234	.	+	.	gene_id "cob"
 molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	.	gene	234	515	.	-	.	gene_id "LSUDE"
-molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	.	gene	1418	2188	.	-	.	gene_id "LSUDE"
+molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	.	gene	1418	2188	.	-	.	gene_id "coxIII"
 molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	.	gene	2132	3557	.	+	.	gene_id "coxI"
 molecule3_PHQJ*OFFpM*B*J*L*VSCQJ*	.	gene	1212	1417	.	-	.	gene_id "LSUFG"
