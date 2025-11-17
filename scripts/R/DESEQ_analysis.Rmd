@@ -736,7 +736,9 @@ for (id in unique(normAntisenseReads$Geneid)){
     geom_point() +
     theme_bw() +
     scale_y_log10() +
-    labs(title = id)
+    labs(title = id,
+         y = expression(log[10]("Normalized Reads")),
+         x = "Condition")
   
   png(filename = paste0("plots/antisense/", id, ".png"),
        width = 16,
