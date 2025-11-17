@@ -535,6 +535,67 @@ relativeChanged_all
 relativeChanged_FL
 ```
 
+## PolyA Tail plots
+
+```{r polya tail plots}
+library(ggridges)
+polyA_files <- list.files("../../out/polyA",
+                          pattern = "*_polyA_lengths.tsv$",
+                          full.names = T)
+polyA <- data_frame()
+for (f in polyA_files){
+  ph <- read.delim(f, header = F) %>% 
+    select(Geneid = V1, polyA = V2, n = V3) %>% 
+    mutate(sample = f,
+           sample = base::gsub("../../out/polyA/", "", sample),
+           sample = base::gsub("_polyA_lengths.tsv", "", sample))
+  
+  polyA <- rbind(polyA, ph)
+}
+
+polyA_summarised <- polyA %>% 
+  group_by(Geneid, sample) %>% 
+  arrange(polyA) %>% 
+  mutate(n_rel = n / sum(n),
+         cumsum = cumsum(n_rel),
+         n_total = sum(n)) %>% 
+  filter(cumsum <= 0.99,
+         n_total >= 25) %>% 
+  ungroup() %>% 
+  mutate(condition = base::substr(sample, 1,3),
+         Geneid = base::gsub("/", "-", Geneid)) %>% 
+  group_by(Geneid, polyA, condition) %>% 
+  summarise(n_mean = mean(n_rel),
+            stdDev = sd(n_rel))
+
+for (id in unique(polyA_summarised$Geneid)){
+  plot <-
+    ggplot(filter(polyA_summarised, Geneid == id),
+                 aes(x = polyA,
+                     y = n_mean,
+                     color = condition,
+                     fill = condition,
+                     ymin = n_mean - stdDev,
+                     ymax = n_mean + stdDev)) +
+    geom_linerange(aes()) +
+    geom_line() +
+    theme_bw() +
+    labs(x = "polyA-tail length",
+         y = "mean relative frequency",
+         title = id)
+  
+  png(filename = paste0("plots/polyA/", id, ".png"),
+       width = 16,
+       height = 9,
+       units = "cm",
+    res = 400)
+  plot(plot)
+  dev.off()  
+  plot(plot)
+}
+```
+
+
 
 ```{r save plots, results='hide'}
 png(filename = "plots/heatmap_all_LFC.png",
