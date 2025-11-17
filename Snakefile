@@ -311,6 +311,8 @@ rule filter_assigned_ids:
         grep -v '^#' {input.report} \
         | awk '$2 == "Assigned"' \
         > {output.filtered_ids}
+
+        rm {input.report}
         """
 
 rule trim_adapters_only:
