@@ -30,9 +30,28 @@ library(edgeR)
 
 ```
 
-## Analysis of mito reads
+# Analysis of mito reads
 
-After finding suitable scaling factors, we use these to normalize the mito mapped reads.  
+## Mapping percentages
+Investigation of relative amounts of reads mapping to the pseudo-genome.  
+Decreases with treatment.
+
+```{r plot mapping percentages, fig.asp=9/19, fig.width=12}
+mapping_perc <- read.table("../../out/mapping_percentages.txt", header = T) %>% 
+  mutate(con = base::substr(sample, 1,3))
+
+ggplot(mapping_perc,
+       aes(x = con,
+           y = percent_mapped)) +
+  geom_point() +
+  theme_bw() +
+  labs(x = "Condition",
+       y = "Fraction of Total Reads Mapped to Mito Genome [%]",
+       title = "Mito Maping Percentages")
+```
+
+## Normalisation
+Using A set of stable genes encoded in the nuclear or apicoplast genome, mito mapped reads are normalized.
 
 ```{r load data}
 countFiles <- list.files("../../out/counts/mito/shortFeatures/sense",
@@ -195,7 +214,7 @@ ggplot(filter(normReads, Geneid %in% example_genes),
              scales = "free_y")
 
 ```
-```{r PCA}
+```{r PCA, fig.asp=9/19, fig.width=12}
 PCA_Reads <- cpm(y, log = TRUE, normalized.lib.sizes = TRUE)
 PCA_reads <- cleanCounts %>% as.matrix()
 
@@ -218,6 +237,10 @@ p1 <- autoplot(pca, "con")
 p1
 
 ```
+
+## DEG Analysis
+Based on the normalized reads, log2fold changes and statistical significance are calculated.  
+Below results are shown in various ways.
 
 ```{r Heatmap all Genes, fig.height=9, fig.width=3.5}
 
@@ -274,7 +297,7 @@ plot(heatmap_sig)
 
 When filtering based on adjusted p value (\<= 0.05) only decreases in rRNA fragment expression remain.
 
-```{r Volcano static}
+```{r Volcano static, fig.asp=9/19, fig.width=12}
 units <- read.csv("intermediates/unit_assignment.csv")
 
 volcano <- res_clean %>% 
@@ -400,7 +423,10 @@ plot(volcano_0_2)
 plot(volcano_0_3)
 
 ```
-### Quantification of Subunits affected
+
+## Quantification of Subunits affected
+The table below highlights the ratio of large and small ribosome subunit fragments.
+
 ```{r quantify unit effect}
 
 unitEffect <- volcano %>% 
@@ -414,49 +440,55 @@ unitEffect <- volcano %>%
   summarise(relative = n() / totalDE) %>% 
   distinct()
 
-
+print(unitEffect)
 ```
 
-### Compare Fragments per RNA 'identity'
+## Compare Fragments per RNA 'identity'
+Grey Log2FCs are not significant.
 
-```{r multi fragment cases}
+```{r multi fragment cases, fig.asp=9/19, fig.width=12}
 
 deMultiFrag <- res_clean %>% 
-  mutate(y_var = -log10(FDR),
-         Geneid2 = Geneid,
+  mutate(Geneid2 = Geneid,
          Geneid = base::gsub("_.*", "", Geneid)
   ) %>% 
-  select(Geneid, Geneid2, logFC, contrast) %>% 
+  select(Geneid, Geneid2, logFC, contrast, FDR) %>% 
   group_by(Geneid)  %>% 
   group_split()
 
-test <- deMultiFrag[[1]] %>% 
+test <- deMultiFrag[[17]] %>% 
   mutate(Geneid2 = ifelse(grepl("_", Geneid2), sub("^[^_]*_", "", Geneid2), "F")) %>% 
-  pivot_wider(values_from = logFC, names_from = Geneid2)
+  pivot_wider(values_from = c(logFC, FDR), names_from = Geneid2)
 
 untangler <- function(df){
   df_untangled <- df %>% 
     mutate(Geneid2 = ifelse(grepl("_", Geneid2), sub("^[^_]*_", "", Geneid2), "F")) %>% 
-    pivot_wider(values_from = logFC, names_from = Geneid2)
+    pivot_wider(values_from = c(logFC, FDR), names_from = Geneid2)
   return(df_untangled)
 }
-
 
 fragTable <- lapply(deMultiFrag, untangler) %>%
   bind_rows()
 
 trueFragmented <- fragTable %>% 
-  filter(!is.na(`1`)) %>% 
-  pivot_longer(cols = 3:5)
+  filter(!is.na(logFC_1)) %>% 
+  pivot_longer(cols = 3:8,
+               names_to = c("stat", "fragment"),
+               names_sep = "_") %>% 
+  pivot_wider(names_from = "stat",
+              values_from = "value") %>% 
+  mutate(color = ifelse(FDR <= 0.05, "black", "grey"))
 
 for (id in unique(trueFragmented$Geneid)){
   plot <- ggplot(
     data = filter(trueFragmented, Geneid == id),
     aes(x = contrast,
-        y = value, 
-        shape = name)
-  ) +
-    geom_point(size = 3) +
+        y = logFC, 
+        shape = fragment,
+        color = color)
+    ) +
+    scale_color_identity() +
+    geom_point(size = 2) +
     theme_bw() +
     labs(x = "",
          y = 'LFC',
@@ -464,15 +496,14 @@ for (id in unique(trueFragmented$Geneid)){
   
   plot(plot)
 }
-
 ```
 
 
-### Relative number of significantly changed rRNAs
+## Relative number of significantly changed rRNAs
 
 Below two variants of relative number of significantly changed rRNA are plotted, one only respects the full length transcripts, the other all annotated transcripts variants.
 
-```{r changed rRNAs}
+```{r changed rRNAs, fig.asp=9/19, fig.width=12}
 all_changed <- res_clean %>% 
   filter(FDR <= fdr_cutoff) %>% 
   mutate(expressed = ifelse(logFC > 0, "firebrick1", "dodgerblue")) %>% 
@@ -537,8 +568,7 @@ relativeChanged_FL
 
 ## PolyA Tail plots
 
-```{r polya tail plots}
-library(ggridges)
+```{r polya tail plots, fig.asp=9/19, fig.width=12}
 polyA_files <- list.files("../../out/polyA",
                           pattern = "*_polyA_lengths.tsv$",
                           full.names = T)
@@ -594,7 +624,6 @@ for (id in unique(polyA_summarised$Geneid)){
   plot(plot)
 }
 ```
-
 
 
 ```{r save plots, results='hide'}
