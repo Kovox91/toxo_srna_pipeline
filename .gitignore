@@ -3,6 +3,7 @@ out/fastqc/*
 out/filtered/*
 out/mapped/*
 out/trimmed/*
+out/polyA/*
 
 scripts/R/plots/*
 scripts/R/*.html

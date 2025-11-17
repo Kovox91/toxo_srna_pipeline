@@ -71,18 +71,6 @@ sample_names = list(samples_df['sample'])
 # Define rule all to specify final output files
 rule all:
     input:
-        # === Trimming & QC ===
-        trimmed_R1 = expand("out/trimmed/{sample}_R1_001_trimmed.fq.gz", sample=sample_names),
-        QC_report = expand("out/fastqc/{sample}_R1_001_trimmed_fastqc.html", sample=sample_names),        
-
-        # === Mapping ===
-        mito_sam_raw = expand("out/mapped/{sample}_mito_mapped.sam",  sample=sample_names),
-        decoy_sam_raw = expand("out/mapped/{sample}_decoy_mapped.sam", sample=sample_names),
-
-        # === Read Filtering ===
-        mito_filtered = expand("out/filtered/{sample}_mito_filtered.bam", sample=sample_names),
-        decoy_filtered = expand("out/filtered/{sample}_decoy_filtered.bam", sample=sample_names),
-
         # === Sorting and Indexing ===
         mito_bam = expand("out/filtered/{sample}_mito_filtered.bam", sample=sample_names),
         mito_bai = expand("out/filtered/{sample}_mito_filtered.bam.bai", sample=sample_names),
@@ -90,7 +78,7 @@ rule all:
         decoy_bam = expand("out/filtered/{sample}_decoy_filtered.bam", sample=sample_names),
         decoy_bai = expand("out/filtered/{sample}_decoy_filtered.bam.bai", sample=sample_names),
 
-        === Summarising .bam Files strand specific ===
+        # === Summarising .bam Files strand specific ===
         mito_bed_plus = expand("out/filtered/strand_cov/{sample}_mito_filtered_plus.bedgraph", sample=sample_names),
         mito_bed_minus = expand("out/filtered/strand_cov/{sample}_mito_filtered_minus.bedgraph", sample=sample_names),
 
@@ -101,7 +89,10 @@ rule all:
 
         counts_decoy = expand("out/counts/decoy/{sample}_decoy_featureCounts.txt", sample=sample_names),
 
-# Create the trim and filter rule
+        # === PolyA Analysis ===
+        polyAsummary = expand("out/polyA/{sample}_polyA_lengths.tsv", sample=sample_names)
+
+
 rule cutadapt_trim_all:
     input:
         R1="in/{sample}_R1_001.fastq.gz"
@@ -147,8 +138,6 @@ rule map_decoy:
             -S {params.index} - > {output.decoy_mapped}
         """
 
-
-
 # Map against pseudo genome
 rule genome_mapping:
     input:
@@ -171,7 +160,6 @@ rule sort_by_name_mito:
     output: "out/mapped/{sample}_mito_mapped_sorted.bam"
     threads: 8
     shell:
-        # drop unmapped (-F 4), keep multi-mappers (DO NOT add -F 0x100/0x800)
         "samtools view -@{threads} -b -F 4 {input} | "
         "samtools sort -n -@{threads} -o {output} -"
 
@@ -185,10 +173,9 @@ rule sort_by_name_decoy:
 
 rule classify_reads:
     input:
-        mito  = "out/mapped/{sample}_mito_mapped_sorted.bam",   # coord-sorted inputs OK
+        mito  = "out/mapped/{sample}_mito_mapped_sorted.bam",   
         decoy = "out/mapped/{sample}_decoy_mapped_sorted.bam"
     output:
-        # write UNSORTED temp BAMs from the classifier
         mito_uns  = temp("out/filtered/{sample}_mito_filtered.unsorted.bam"),
         decoy_uns = temp("out/filtered/{sample}_decoy_filtered.unsorted.bam")
     threads: 8
@@ -227,7 +214,7 @@ rule sort_index_decoy:
         samtools index {output.bam}
         """
 
-# Summarise Filtered mit .bam files by strand
+# Summarise Filtered mito .bam files by strand
 rule strand_cov:
     input:
         bam = "out/filtered/{sample}_mito_filtered.bam"
@@ -238,25 +225,6 @@ rule strand_cov:
         """
         bedtools genomecov -ibam {input.bam} -strand + -bg > {output.plus}
         bedtools genomecov -ibam {input.bam} -strand - -bg > {output.minus}
-        """
-
-rule featurecounts_mito_short_sense:
-    input:
-        bam = "out/filtered/{sample}_mito_filtered.bam"
-    output:
-        tsv = "out/counts/mito/shortFeatures/sense/{sample}_mito_featureCounts.txt",
-        sum = "out/counts/mito/shortFeatures/sense/{sample}_mito_featureCounts.txt.summary"
-    threads: 8
-    params:
-        stranded = 1, feature = "rRNA", attr = "rRNA_id"
-    shell:
-        r"""
-        featureCounts -T {threads} \
-          -a "references/pseudo_genome/RNA_index_rebuild.gtf" -t {params.feature} -g {params.attr} \
-          -s {params.stranded} \
-          --fracOverlapFeature 0.8 \
-          --largestOverlap \
-          -o {output.tsv} {input.bam}
         """
 
 rule featurecounts_mito_short_antisense:
@@ -311,4 +279,117 @@ rule featurecounts_decoy:
           -a "references/decoy/ToxoDB-68_TgondiiRH88.gft" -t {params.feature} -g {params.attr} \
           -s {params.stranded} \
           -o {output.tsv} {input.bam}
+        """
+
+rule featurecounts_mito_short_sense:
+    input:
+        bam = "out/filtered/{sample}_mito_filtered.bam"
+    output:
+        tsv = "out/counts/mito/shortFeatures/sense/{sample}_mito_featureCounts.txt",
+        sum = "out/counts/mito/shortFeatures/sense/{sample}_mito_featureCounts.txt.summary"
+    threads: 8
+    params:
+        stranded = 1, feature = "rRNA", attr = "rRNA_id"
+    shell:
+        r"""
+        featureCounts -T {threads} \
+          -a "references/pseudo_genome/RNA_index_rebuild.gtf" -t {params.feature} -g {params.attr} \
+          -s {params.stranded} \
+          --fracOverlapFeature 0.8 \
+          --largestOverlap \
+          -R CORE \
+          -o {output.tsv} {input.bam}
+        """
+
+rule filter_assigned_ids:
+    input:
+        report="out/counts/mito/shortFeatures/sense/{sample}_mito_filtered.bam.featureCounts"
+    output:
+        filtered_ids=temp("out/polyA/{sample}.filtered_ids.txt")
+    shell:
+        r"""
+        grep -v '^#' {input.report} \
+        | awk '$2 == "Assigned"' \
+        > {output.filtered_ids}
+        """
+
+rule trim_adapters_only:
+    input:
+        R1="in/{sample}_R1_001.fastq.gz"
+    output:
+        R1_trimmed=temp("out/polyA/{sample}_R1_001_trimmed.fq.gz")
+    threads: 8
+    shell:
+        r"""
+        cutadapt -j {threads} -q 20 -m 15 --trim-n \
+          -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC \
+          -o {output.R1_trimmed} {input.R1}
+        """
+
+rule extract_assigned_reads:
+    input:
+        R1_trimmed="out/polyA/{sample}_R1_001_trimmed.fq.gz",
+        filtered_ids="out/polyA/{sample}.filtered_ids.txt"
+    output:
+        assigned_fastq=temp("out/polyA/{sample}_assigned.fastq")
+    shell:
+        r"""
+        # extract only the read IDs (1st column)
+        awk '{{print $1}}' {input.filtered_ids} > out/polyA/{wildcards.sample}.idlist.txt
+
+        # subset FASTQ to those IDs
+        seqtk subseq {input.R1_trimmed} out/polyA/{wildcards.sample}.idlist.txt > {output.assigned_fastq}
+
+        rm out/polyA/{wildcards.sample}.idlist.txt
+        """
+
+rule polyA_lengths:
+    input:
+        assigned_fastq = "out/polyA/{sample}_assigned.fastq",
+        id_feature     = "out/polyA/{sample}.filtered_ids.txt"
+    output:
+        stats = temp("out/polyA/{sample}_polyA_lengths_with_features.tsv")
+    shell:
+        r"""
+        awk 'NR==FNR {{
+                 # First pass: read FASTQ and compute per-read length & polyA tail
+                 if (FNR%4==1) {{
+                     id=$1
+                     sub(/^@/, "", id)
+                     cur=id
+                 }} else if (FNR%4==2) {{
+                     seq=$1
+                     L=length(seq)
+                     tail=0
+                     for (i=L; i>0; i--) {{
+                         c=substr(seq, i, 1)
+                         if (c=="A" || c=="a") tail++
+                         else break
+                     }}
+                     len[cur]=L
+                     poly[cur]=tail
+                 }}
+                 next
+             }}
+             # Second pass: go through filtered_ids and append L and tail
+             {{
+                 id=$1
+                 L = (id in len ? len[id] : "NA")
+                 tail = (id in poly ? poly[id] : "NA")
+                 print $0 "\t" L "\t" tail
+             }}' {input.assigned_fastq} {input.id_feature} > {output.stats}
+        """
+
+rule summarise_polyA:
+    input:
+        stats = "out/polyA/{sample}_polyA_lengths_with_features.tsv"
+    output:
+        summary = "out/polyA/{sample}_polyA_lengths.tsv"
+    shell:
+        r"""
+        cut -f4,6 {input.stats} \
+        | sort \
+        | uniq -c \
+        | awk '{{print $2"\t"$3"\t"$1}}' \
+        > {output.summary}
         """
