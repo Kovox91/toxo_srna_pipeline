@@ -477,7 +477,7 @@ trueFragmented <- fragTable %>%
                names_sep = "_") %>% 
   pivot_wider(names_from = "stat",
               values_from = "value") %>% 
-  mutate(color = ifelse(FDR <= 0.05, "black", "grey"))
+  mutate(color = ifelse(FDR <= fdr_cutoff, "black", "grey"))
 
 for (id in unique(trueFragmented$Geneid)){
   plot <- ggplot(
@@ -623,6 +623,131 @@ for (id in unique(polyA_summarised$Geneid)){
   dev.off()  
   plot(plot)
 }
+```
+
+## Antisense Analysis
+
+```{r Normalize Antisense counts}
+
+# Load antisense counts
+antisenseCountFiles <- list.files("../../out/counts/mito/shortFeatures/antisense",
+                         pattern = "*mito_featureCounts.txt$",
+                         full.names = TRUE)
+
+nSample <- length(antisenseCountFiles)
+
+absoluteNormalizators <- base::readRDS("intermediates/absolute_norm_values.RDS")
+
+coldata <- read.csv("../../samples.csv")
+
+antisenseMitoCounts <- read.delim(antisenseCountFiles[1], header = T, skip = 1) %>% 
+  select(Geneid, last_col())
+for (file in antisenseCountFiles[2:length(antisenseCountFiles)]){
+  counts <- read.delim(file, header = T, skip = 1) %>% 
+    select(Geneid, last_col())
+  antisenseMitoCounts <- left_join(antisenseMitoCounts, counts, by = "Geneid")
+}
+
+cleanAntisenseCounts <- antisenseMitoCounts %>% 
+  mutate(Geneid = base::gsub(".rRNA", "", Geneid)) %>% 
+  pivot_longer(cols = 1:nSample+1,names_to = "sample") %>% 
+  mutate(sample = base::gsub("out.filtered.", "", sample),
+         sample = base::gsub("_mito_filtered.bam", "", sample),
+         sample = base::gsub("\\.", "_", sample)) %>% 
+  pivot_wider(names_from = sample,
+              values_from = value)
+
+# Normalize as before
+# mitoCounts: matrix of mito features (rows) x samples (columns), raw counts
+mitoCounts <- cleanAntisenseCounts %>%
+  mutate(Geneid = paste0(Geneid, "XX")) %>%
+  column_to_rownames("Geneid") 
+
+# group: factor of conditions for each sample (length = ncol(mitoCounts))
+group <- factor(base::substr(colnames(mitoCounts), 1,3), levels = unique(base::substr(colnames(mitoCounts), 1,3)))
+
+# anchor A_j:   numeric vector of length ncol(mitoCounts)
+#               IMPORTANT: A_j must exclude mitochondrial reads; >0 in every sample
+Aj <- absoluteNormalizators$value
+
+
+# 1) Prepare DGEList with offset-only normalization (NO TMM)
+Aj <- Aj * (1e6 / median(Aj))       # optional rescale for stability
+y  <- DGEList(mitoCounts)
+
+y$samples$lib.size <- Aj
+y$samples$group <- group
+
+# 2) Design with all groups (no intercept), pr_0 will be the baseline in contrasts
+design <- model.matrix(~ 0 + group)
+colnames(design) <- levels(group)
+
+# 3) Dispersion + fit (QL pipeline)
+y  <- estimateDisp(y, design)
+fit <- glmQLFit(y, design)
+
+# 4) Define contrasts: (first) - (pr_0)
+CT <- makeContrasts(
+  par_pr0 = par - pr0,
+  pr0_pr1 = pr1    - pr0,   # logFC > 0 => pr_1 > pr_0
+  pr0_pr2 = pr2    - pr0,
+  pr0_pr3 = pr3    - pr0,
+  levels = design
+)
+
+# 5) Run tests and collect results
+run_one <- function(fit, contr_name) {
+  tt <- glmQLFTest(fit, contrast = CT[, contr_name])
+  out <- topTags(tt, n = Inf)$table
+  out$contrast <- contr_name
+  out
+}
+
+res_list <- lapply(colnames(CT), function(nm) run_one(fit, nm))
+resAntisense <- do.call(rbind, res_list)
+
+# res has logFC (relative to the anchor), PValue, FDR for each feature/bin and contrast
+split(resAntisense, resAntisense$contrast) |>
+  lapply(function(df) df[order(df$FDR), ]) -> by_contrast
+
+resAntisenseClean <- resAntisense %>% 
+  rownames_to_column("Geneid") %>% 
+  mutate(Geneid = sub("XX.*", "", Geneid))
+
+
+normAntisenseReads <- data.frame(norm_counts <- cpm(y, normalized.lib.sizes = TRUE)) %>%
+  rownames_to_column("Geneid") %>%
+  mutate(Geneid = sub("XX", "", Geneid)) %>%
+  pivot_longer(cols = 1:nSample+1,
+               names_to = "sample_name",
+               values_to = "antisense") %>% 
+  mutate(con = base::substr(sample_name, 1,3)) %>% 
+  group_by(Geneid) %>% 
+  filter(max(antisense) >= 10) %>% 
+  left_join(normReads, by = c("Geneid", "sample_name")) %>% 
+  select(Geneid, antisense, sense = value, con = con.x) %>% 
+  pivot_longer(cols = c("sense", "antisense"))
+
+for (id in unique(normAntisenseReads$Geneid)){
+  plot <- ggplot(filter(normAntisenseReads, Geneid == id),
+                 aes(x = con,
+                     y = value,
+                     color = name)) +
+    geom_point() +
+    theme_bw() +
+    scale_y_log10() +
+    labs(title = id)
+  
+  png(filename = paste0("plots/antisense/", id, ".png"),
+       width = 16,
+       height = 9,
+       units = "cm",
+    res = 400)
+  plot(plot)
+  dev.off()  
+  plot(plot)
+}
+
 ```
 
 

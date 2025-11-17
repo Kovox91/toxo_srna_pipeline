@@ -1,3 +1,4 @@
+!*/.gitkeep
 in/*
 out/fastqc/*
 out/filtered/*
@@ -5,10 +6,9 @@ out/mapped/*
 out/trimmed/*
 out/polyA/*
 
-scripts/R/plots/*
+scripts/R/plots/*.png
 scripts/R/*.html
 *.png
 !out/counts
 .snakemake
 Miniconda3-latest.sh
-!*.gitkeep
