@@ -90,7 +90,7 @@ rule all:
         decoy_bam = expand("out/filtered/{sample}_decoy_filtered.bam", sample=sample_names),
         decoy_bai = expand("out/filtered/{sample}_decoy_filtered.bam.bai", sample=sample_names),
 
-        === Summarising .bam Files strand specific ===
+        # === Summarising .bam Files strand specific ===
         mito_bed_plus = expand("out/filtered/strand_cov/{sample}_mito_filtered_plus.bedgraph", sample=sample_names),
         mito_bed_minus = expand("out/filtered/strand_cov/{sample}_mito_filtered_minus.bedgraph", sample=sample_names),
 
@@ -99,7 +99,7 @@ rule all:
         counts_mito_short_antisense = expand("out/counts/mito/shortFeatures/antisense/{sample}_mito_featureCounts.txt", sample=sample_names),
         counts_mito_long = expand("out/counts/mito/longFeatures/{sample}_mito_featureCounts.txt", sample=sample_names),
 
-        counts_decoy = expand("out/counts/decoy/{sample}_decoy_featureCounts.txt", sample=sample_names),
+        counts_decoy = expand("out/counts/decoy/{sample}_decoy_featureCounts.txt", sample=sample_names)
 
 # Create the trim and filter rule
 rule cutadapt_trim_all:

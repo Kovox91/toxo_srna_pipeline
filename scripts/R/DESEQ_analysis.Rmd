@@ -30,9 +30,26 @@ library(edgeR)
 
 ```
 
+## Mapping percentages
+```{r}
+coldata <- read.csv("../../samples.csv")
+
+data <- read.delim("../../out/mapping_percentages.txt") %>% 
+  left_join(coldata, by = "sample")
+
+ggplot(data,
+       aes(x = con, y = percent_mapped)) +
+  geom_point() +
+  theme_bw() +
+  labs(x = "Condition",
+       y = "Mito Mapped Reads per Library Size [%]",
+       title = "HPR3 -- Mapping Percentages")
+```
+
+
 ## Analysis of mito reads
 
-After finding suitable scaling factors, we use these to normalize the mito mapped reads.  
+After finding suitable scaling genes, we use their total read numbers per sample normalize the mito mapped reads.
 
 ```{r load data}
 countFiles <- list.files("../../out/counts/mito/shortFeatures/sense",
@@ -43,7 +60,6 @@ nSample <- length(countFiles)
 
 absoluteNormalizators <- base::readRDS("intermediates/absolute_norm_values.RDS")
 
-coldata <- read.csv("../../samples.csv")
 
 mitoCounts <- read.delim(countFiles[1], header = T, skip = 1) %>% 
   select(Geneid, last_col())
@@ -66,6 +82,9 @@ cleanShortCounts <- mitoCounts %>%
   mutate(sample = base::gsub("out.filtered.", "", sample),
          sample = base::gsub("_mito_filtered.bam", "", sample),
          sample = base::gsub("\\.", "_", sample)) %>% 
+  merge(coldata, by = "sample") %>% 
+  select(sample = sample_name, Geneid, value) %>% 
+  mutate(sample = base::gsub("\\-", "_", sample)) %>% 
   pivot_wider(names_from = sample,
               values_from = value)
 
@@ -82,20 +101,25 @@ cleanLongCounts <- longCounts %>%
   mutate(sample = base::gsub("out.filtered.", "", sample),
          sample = base::gsub("_mito_filtered.bam", "", sample),
          sample = base::gsub("\\.", "_", sample)) %>% 
+  merge(coldata, by = "sample") %>% 
+  select(sample = sample_name, Geneid, value) %>% 
+  mutate(sample = base::gsub("\\-", "_", sample)) %>% 
   pivot_wider(names_from = sample,
               values_from = value)
 
 cleanCounts <- rbind(cleanShortCounts, cleanLongCounts)
+
 ```
 
-```{r plot example genes, fig.asp=9/19, fig.width=12}
-example_genes = c("SSUB", "RNA10_F", "RNA10_1", "RNA10_2", "RNA33_F", "RNA33_1", "RNA33_2")
-
+```{r plot raw reads for example genes, fig.asp=9/19, fig.width=12}
+# Set example genes throughout the document
+example_genes = c("RNA16", "RNA31_F", "RNA31_1")
 
 example_plot <- cleanCounts %>% 
   filter(Geneid %in% example_genes) %>% 
   pivot_longer(cols = 1:nSample+1,names_to = "sample_name") %>% 
-  mutate(con = base::substr(sample_name, 1,3))
+  mutate(sample_name = base::gsub("\\_", "-", sample_name)) %>% 
+  merge(coldata, by = "sample_name") 
 
 ggplot(example_plot,
        aes(x = con,
@@ -110,8 +134,8 @@ ggplot(example_plot,
   facet_wrap(~Geneid,
              scales = "free_y")
 
-
 ```
+
 ```{r Normalize}
 # mitoCounts: matrix of mito features (rows) x samples (columns), raw counts
 mitoCounts <- cleanCounts %>%
@@ -119,7 +143,7 @@ mitoCounts <- cleanCounts %>%
   column_to_rownames("Geneid") 
 
 # group: factor of conditions for each sample (length = ncol(mitoCounts))
-group <- factor(base::substr(colnames(mitoCounts), 1,3), levels = unique(base::substr(colnames(mitoCounts), 1,3)))
+group <- factor(base::gsub("_Rep.*", "", colnames(mitoCounts)), levels = unique(base::gsub("_Rep.*", "", colnames(mitoCounts))))
 
 # anchor A_j:   numeric vector of length ncol(mitoCounts)
 #               IMPORTANT: A_j must exclude mitochondrial reads; >0 in every sample
@@ -143,10 +167,11 @@ fit <- glmQLFit(y, design)
 
 # 4) Define contrasts: (first) - (pr_0)
 CT <- makeContrasts(
-  par_pr0 = par - pr0,
-  pr0_pr1 = pr1    - pr0,   # logFC > 0 => pr_1 > pr_0
-  pr0_pr2 = pr2    - pr0,
-  pr0_pr3 = pr3    - pr0,
+  par0_par3 = par_Day_3 - par_Day_0,
+  par0_pr0 = pr_Day_0 - par_Day_0,
+  pr0_pr1 = pr_Day_1    - pr_Day_0,   # logFC > 0 => pr_1 > pr_0
+  pr0_pr2 = pr_Day_2    - pr_Day_0,
+  pr0_pr3 = pr_Day_3    - pr_Day_0,
   levels = design
 )
 
@@ -177,8 +202,9 @@ normReads <- data.frame(norm_counts <- cpm(y, normalized.lib.sizes = TRUE)) %>%
   mutate(Geneid = sub("XX", "", Geneid)) %>%
   pivot_longer(cols = 1:nSample+1,
                names_to = "sample_name",
-               values_to = "value") %>% 
-  mutate(con = base::substr(sample_name, 1,3))
+               values_to = "value") %>%
+  mutate(sample_name = base::gsub("\\_", "-", sample_name)) %>% 
+  merge(coldata, by = "sample_name") 
 
 
 ggplot(filter(normReads, Geneid %in% example_genes),
@@ -195,6 +221,9 @@ ggplot(filter(normReads, Geneid %in% example_genes),
              scales = "free_y")
 
 ```
+
+The normalization smoothes the differences between replicates, but preserves the overall trend.
+
 ```{r PCA}
 PCA_Reads <- cpm(y, log = TRUE, normalized.lib.sizes = TRUE)
 PCA_reads <- cleanCounts %>% as.matrix()
@@ -202,10 +231,10 @@ PCA_reads <- cleanCounts %>% as.matrix()
 
 pca <- prcomp(t(PCA_Reads), scale. = TRUE)
 ve <- round(100 * (pca$sdev^2 / sum(pca$sdev^2)), 1)
-pc <- pca
+
 
 autoplot <- function(pc, col) {
-  df <- data.frame(pc$x[,1:2], group = base::substr(rownames(pc$x), 1,3))
+  df <- data.frame(pc$x[,1:2], group = base::gsub("_Rep.*", "", rownames(pc$x)))
   ggplot(df, aes(PC1, PC2, shape = group)) +
     geom_point(size = 2) +
     labs(x = paste0("PC1 (", ve[1], "%)"),
@@ -256,7 +285,7 @@ lfc_matrix_minimal <- res_clean %>%
   filter(if_any(-Geneid, ~!is.na(.x))) %>% 
   select_if(~sum(!is.na(.)) > 0) %>% 
   column_to_rownames("Geneid") %>% 
-  arrange(pr0_pr2, pr0_pr3) %>%
+  arrange(pr0_pr1, pr0_pr3) %>%
   as.matrix()
 
 col_fun2 = colorRamp2(c(2, 0, floor(min(lfc_matrix_minimal, na.rm = TRUE))),
@@ -400,73 +429,40 @@ plot(volcano_0_2)
 plot(volcano_0_3)
 
 ```
-### Quantification of Subunits affected
-```{r quantify unit effect}
 
-unitEffect <- volcano %>% 
-  select(Geneid, FDR, logFC, contrast, unit) %>% 
-  filter(FDR <= fdr_cutoff) %>% 
-  mutate(expressed = ifelse(sign(logFC) == -1, "down", "up")) %>% 
-  group_by(contrast, expressed) %>% 
-  mutate(totalDE = n()) %>% 
-  ungroup() %>% 
-  group_by(contrast, unit, expressed) %>% 
-  summarise(relative = n() / totalDE) %>% 
-  distinct()
+For day 3 comparisons, the plot was made interactive, since the points are too dense for labels. Hover the Points to see the gene.
+
+```{r Volcano interactive}
+# Due to the dense Distribution of samples, this plot is created interactively with plotly
+volc1 <- ggplot(data = filter(volcano, contrast == "pr0_pr3"),
+       aes(x = logFC,
+           y = y_var,
+           ID = Geneid)) +
+  # Plot LFC against FDR
+  geom_point(aes(color = color)) +
+  scale_color_identity() +
+  # Add cutoff indicators
+  geom_hline(yintercept = -log10(fdr_cutoff),
+             linetype = "dashed",
+             color = "grey40") +
+  geom_vline(xintercept = -1,
+             linetype = "dashed",
+             color = "grey40") +
+  geom_vline(xintercept = 1,
+           linetype = "dashed",
+           color = "grey40") +
+  # Adjust titles
+  labs(x = expression(log[2]("fold change")),
+       y = expression(-log[10](padj)),
+       title = "Day 0 vs Day 3") +
+  # Set theme
+  theme(legend.position = "none") +
+  theme_bw() 
+
+suppressWarnings(ggplotly(hide_legend(volc1), tooltip = c("ID")))
 
 
 ```
-
-### Compare Fragments per RNA 'identity'
-
-```{r multi fragment cases}
-
-deMultiFrag <- res_clean %>% 
-  mutate(y_var = -log10(FDR),
-         Geneid2 = Geneid,
-         Geneid = base::gsub("_.*", "", Geneid)
-  ) %>% 
-  select(Geneid, Geneid2, logFC, contrast) %>% 
-  group_by(Geneid)  %>% 
-  group_split()
-
-test <- deMultiFrag[[1]] %>% 
-  mutate(Geneid2 = ifelse(grepl("_", Geneid2), sub("^[^_]*_", "", Geneid2), "F")) %>% 
-  pivot_wider(values_from = logFC, names_from = Geneid2)
-
-untangler <- function(df){
-  df_untangled <- df %>% 
-    mutate(Geneid2 = ifelse(grepl("_", Geneid2), sub("^[^_]*_", "", Geneid2), "F")) %>% 
-    pivot_wider(values_from = logFC, names_from = Geneid2)
-  return(df_untangled)
-}
-
-
-fragTable <- lapply(deMultiFrag, untangler) %>%
-  bind_rows()
-
-trueFragmented <- fragTable %>% 
-  filter(!is.na(`1`)) %>% 
-  pivot_longer(cols = 3:5)
-
-for (id in unique(trueFragmented$Geneid)){
-  plot <- ggplot(
-    data = filter(trueFragmented, Geneid == id),
-    aes(x = contrast,
-        y = value, 
-        shape = name)
-  ) +
-    geom_point(size = 3) +
-    theme_bw() +
-    labs(x = "",
-         y = 'LFC',
-         title = id)
-  
-  plot(plot)
-}
-
-```
-
 
 ### Relative number of significantly changed rRNAs
 
