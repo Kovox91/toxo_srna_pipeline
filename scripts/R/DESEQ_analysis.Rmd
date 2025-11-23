@@ -6,6 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
+setwd("/media/molgenuser/DATA/Sascha_analyses/HPR4_toxo_srna_pipeline/scripts/R")
 knitr::opts_chunk$set(echo = FALSE,
                       message = FALSE,
                       warning = FALSE,
