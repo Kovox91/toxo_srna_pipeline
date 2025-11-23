@@ -233,6 +233,7 @@ rule featurecounts_mito_short_antisense:
     output:
         tsv = "out/counts/mito/shortFeatures/antisense/{sample}_mito_featureCounts.txt",
         sum = "out/counts/mito/shortFeatures/antisense/{sample}_mito_featureCounts.txt.summary"
+        rep = "out/counts/mito/shortFeatures/sense/{sample}_mito_filtered.bam.featureCounts"
     threads: 8
     params:
         stranded = 2, feature = "rRNA", attr = "rRNA_id"
