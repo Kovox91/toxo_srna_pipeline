@@ -1,0 +1,4 @@
+cond1,cond2,effect direction,n
+rmRSiC-FLAG -ATc,rmRSiC-FLAG 1d ATc,down,1
+rmRSiC-FLAG -ATc,rmRSiC-FLAG 2d ATc,down,28
+rmRSiC-FLAG -ATc,rmRSiC-FLAG 3d ATc,down,41
