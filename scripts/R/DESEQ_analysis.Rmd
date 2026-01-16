@@ -8,7 +8,8 @@ output: html_document
 ```{r setup, include=FALSE}
 setwd("/media/molgenuser/DATA/Sascha_analyses/HPR4_toxo_srna_pipeline/scripts/R")
 plot_dir <- "plots/paper_plots" # "/run/user/1000/gvfs/smb-share:server=hubiombp12c.cms.hu-berlin.de,share=biomolgenetik/Lab4/Sabrina/HPR4/paper/plots_Sascha"
-knitr::opts_chunk$set(echo = FALSE,
+knitr::opts_chunk$set(echo = TRUE,
+                      eval = FALSE,
                       message = FALSE,
                       warning = FALSE,
                       fig.align = "center")

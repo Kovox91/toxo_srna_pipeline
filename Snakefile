@@ -82,6 +82,9 @@ rule all:
         mito_bed_plus = expand("out/filtered/strand_cov/{sample}_mito_filtered_plus.bedgraph", sample=sample_names),
         mito_bed_minus = expand("out/filtered/strand_cov/{sample}_mito_filtered_minus.bedgraph", sample=sample_names),
 
+        # === Start and End Positions ===
+        mito_read_start_end = expand("out/filtered/strand_cov/{sample}_mito_filtered_read_start_end.bed", sample=sample_names),
+
         # === Counting ===
         counts_mito_short_sense = expand("out/counts/mito/shortFeatures/sense/{sample}_mito_featureCounts.txt", sample=sample_names),
         counts_mito_short_antisense = expand("out/counts/mito/shortFeatures/antisense/{sample}_mito_featureCounts.txt", sample=sample_names),
@@ -134,7 +137,7 @@ rule map_decoy:
         r"""
         mkdir -p out/mapped
         zcat {input.R1_trimmed} | \
-        bowtie -q -q -v 1 -k 4 --best --strata -p {threads} \
+        bowtie -q -v 1 -k 4 --best --strata -p {threads} \
             -S {params.index} - > {output.decoy_mapped}
         """
 
@@ -225,6 +228,36 @@ rule strand_cov:
         """
         bedtools genomecov -ibam {input.bam} -strand + -bg > {output.plus}
         bedtools genomecov -ibam {input.bam} -strand - -bg > {output.minus}
+        """
+
+rule start_end_positions:
+    input:
+        bam = "out/filtered/{sample}_mito_filtered.bam"
+    output:
+        reads_start_end = "out/filtered/strand_cov/{sample}_mito_filtered_read_start_end.bed"
+    shell:
+        r"""
+        bedtools bamtobed -split -i {input.bam} \
+            | awk 'BEGIN{OFS="\t"}
+            {
+            if ($6 == "+") {
+                s = $2 + 1; e = $3
+            } else {
+                s = $3;     e = $2 + 1
+            }
+            start[$1 FS s FS $6]++
+            end[$1 FS e FS $6]++
+            }
+            END {
+            for (k in start) {
+                split(k, a, FS)
+                print a[1], a[2], start[k], a[3], "start"
+            }
+            for (k in end) {
+                split(k, a, FS)
+                print a[1], a[2], end[k], a[3], "end"
+            }
+            }' > {output.reads_start_end}
         """
 
 rule featurecounts_mito_short_antisense:
