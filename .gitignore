@@ -26,7 +26,10 @@ scripts/R/*.html
 *.RDS
 
 !references/*
-
+references/decoy/
 .snakemake
 Miniconda3-latest.sh
 .Rproj.user
+
+
+!.gitkeep
