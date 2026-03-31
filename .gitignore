@@ -7,6 +7,7 @@ Snakefile_counts
 # ignore all output files
 *.txt
 *.tsv
+*.csv
 *.bam
 *.bai
 *.bed
@@ -31,5 +32,6 @@ references/decoy/
 Miniconda3-latest.sh
 .Rproj.user
 
-
+*.tar.bz2
+*.tar.gz
 !.gitkeep
