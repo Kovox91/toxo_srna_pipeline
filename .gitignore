@@ -1,14 +1,37 @@
+!*/.gitkeep
 in/*
-out/fastqc/*
-out/filtered/*
-out/mapped/*
-out/trimmed/*
-out/counts/*
+out/*
 
-scripts/R/plots/*
+Snakefile_counts
+
+# ignore all output files
+*.txt
+*.tsv
+*.csv
+*.bam
+*.bai
+*.bed
+*.bedgraph
+*.fq
+*.fq.gz
+
+*.png
+*.svg
+
 scripts/R/*.html
 *.png
 
+*.Rproj
+*.Rhistory
+*.RData
+*.RDS
+
+!references/*
+references/decoy/
 .snakemake
 Miniconda3-latest.sh
-!*.gitkeep
+.Rproj.user
+
+*.tar.bz2
+*.tar.gz
+!.gitkeep
