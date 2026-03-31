@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-setwd("/media/molgenuser/DATA/Sascha_analyses/HPR4_toxo_srna_pipeline/scripts/R")
+# setwd("/media/molgenuser/DATA/Sascha_analyses/HPR4_toxo_srna_pipeline/scripts/R")
 plot_dir <- "plots/paper_plots" # "/run/user/1000/gvfs/smb-share:server=hubiombp12c.cms.hu-berlin.de,share=biomolgenetik/Lab4/Sabrina/HPR4/paper/plots_Sascha"
 knitr::opts_chunk$set(echo = TRUE,
                       eval = FALSE,
@@ -31,7 +31,6 @@ library(ComplexHeatmap)
 library(circlize)
 library(edgeR)
 library(ggsignif)
-
 ```
 
 # Analysis of mito reads
@@ -175,10 +174,11 @@ signif_df <- res_plot %>%
 
 ggplot(mapping_perc_sum,
        aes(x = con, y = mean)) +
-  geom_point(aes(color = col)) +
+  geom_point(aes(color = col), size = 0.25) +
   geom_linerange(aes(ymin = mean - SEM,
                      ymax = mean + SEM,
-                     color = col)) +
+                     color = col),
+                 linewidth = 0.05) +
   scale_color_identity()+
   geom_signif(
     data   = signif_df,
@@ -188,9 +188,10 @@ ggplot(mapping_perc_sum,
         y_position = y_position),
     manual    = TRUE,
     tip_length = 0,
-    textsize   = 3
+    textsize   = 1.5,
+    size = 0.05
   ) +
-  theme_bw() +
+  theme_diss() +
   scale_x_discrete(labels = c(
   "par" = "Parental \nDay 0",
   "pr0" = "rHPR4-FLAG \nDay 0",
@@ -203,12 +204,11 @@ ggplot(mapping_perc_sum,
     y     = "Fraction of Total Reads Mapped to Mito Genome [%]",
   )
 
-ggsave(filename = "mapping_percentages.svg",
-       path = plot_dir,
+ggsave(filename = "~/diss_plots/mrsic_mapping_percentages.svg",
        device = "svg",
-       width = 16,
-       height = 11,
-       units = "cm",
+       width = 50,
+       height = 40,
+       units = "mm",
        )
 
 ```
@@ -309,7 +309,6 @@ Aj <- absoluteNormalizators$value
 
 
 # 1) Prepare DGEList with offset-only normalization (NO TMM)
-Aj <- Aj * (1e6 / median(Aj))       # optional rescale for stability
 y  <- DGEList(mitoCounts)
 
 y$samples$lib.size <- Aj
@@ -362,6 +361,20 @@ normReads <- data.frame(norm_counts <- cpm(y, normalized.lib.sizes = TRUE)) %>%
                values_to = "value") %>% 
   mutate(con = base::substr(sample_name, 1,3))
 
+norm_reads_sum <- normReads %>% 
+  group_by(sample_name) %>% 
+  summarise(val = sum(value)) %>% 
+  mutate(con = base::substr(sample_name, 1,3),
+         norm = "modified") %>% 
+  bind_rows(norm_reads_sum_base) %>% 
+  ungroup() %>% 
+  dplyr::group_by(norm) %>% 
+  mutate(val_scale = (val- min(val)) /(max(val)-min(val))) %>% 
+  ungroup() %>% 
+  group_by(con, norm) %>% 
+  mutate(val_mean = mean(val_scale),
+         val_sem = sd(val_scale) / sqrt(n()))
+  
 
 ggplot(filter(normReads, Geneid %in% example_genes),
        aes(x = con,
@@ -376,6 +389,28 @@ ggplot(filter(normReads, Geneid %in% example_genes),
   facet_wrap(~Geneid,
              scales = "free_y")
 
+saveRDS(norm_reads_sum,
+        "intermediates/normalisation_comp.RDS")
+
+ggplot(norm_reads_sum,
+       aes(x = con,
+           y = val_mean)) +
+  geom_point(size = 0.25) +
+  geom_linerange(aes(ymin = val_mean - val_sem,
+                     ymax = val_mean + val_sem),
+                 linewidth = 0.05) +
+  theme_bw() +
+  facet_wrap(~norm) +
+  labs(y = "Normalized CPM") +
+  theme_diss() +
+    theme(axis.title.x = element_blank())
+
+ggsave(filename = "~/diss_plots/mrsic_norm_comp_total.svg",
+       device = "svg",
+       width = 100,
+       height = 40,
+       units = "mm",
+       )
 ```
 
 ```{r PCA, fig.asp=9/19, fig.width=12}
@@ -428,6 +463,27 @@ heatmap_all <- Heatmap(lfc_matrix,
 plot(heatmap_all)
 ```
 
+```{r}
+relevant_vals <- cleanCounts %>% 
+  select(Geneid, par1, par2, par3, pr0_1, pr0_2, pr0_3)
+
+uptick_expl <- volcano %>% 
+  filter(contrast == "par_pr0") %>% 
+  select(Geneid, logFC, contrast) %>% 
+  left_join(relevant_vals) %>% 
+  pivot_longer(cols = 4:9) %>% 
+  mutate(trend = as.character(sign(logFC)))
+
+ggplot(uptick_expl,
+       aes(x = trend,
+           y = value)) +
+  geom_boxplot() +
+  geom_jitter(alpha = 0.6) +
+  scale_y_log10() +
+  theme_bw() 
+```
+
+
 Based on unfiltered log2fold changes, the general trend continues: over all, mito rRNA transcription presumably is dampened by the suppression of HPR4 transcription.
 
 ```{r filtered Heatmap, fig.height=7.5, fig.width=3.5}
@@ -469,7 +525,7 @@ units <- read.csv("intermediates/unit_assignment.csv")%>%
   ) %>%
   ungroup()
 
-GOI <- c("RNA33_1", "RNA33_F", "RNA42", "RNA7", "SSUB")
+GOI <- c("RNA33_1", "RNA33_F", "RNA42")
 # In Case we want SSUB and RNA 7 in:
 # , "RNA7", "SSUB"
 
@@ -483,7 +539,7 @@ volcano <- res_clean %>%
            #   FDR <= fdr_cutoff &
              Geneid %in% GOI, Geneid, ""),
          Geneid2 = Geneid,
-         Geneid = base::gsub("_.*", "", Geneid)
+         Geneid = base::gsub("_F", "", Geneid)
   ) %>% 
   left_join(units, by = "Geneid") %>% 
   mutate(Geneid = Geneid2,
@@ -494,9 +550,9 @@ volcano <- res_clean %>%
                           )) %>% 
   mutate(color = ifelse(FDR <= fdr_cutoff & abs(logFC) >= 1, unit, "grey"),
          color = case_when(
-           color == "LSU" ~ "#8b11a5",
-           color == "SSU" ~ "#b074c0",
-           color == "both" ~ "#7A4CB8",
+           color == "LSU" ~ "#ff33ff",
+           color == "SSU" ~ "#cc00ff",
+           color == "both" ~ "#9900ff",
            color == "unassigned" ~ "black",
            TRUE ~ "grey"
          ),
@@ -511,7 +567,7 @@ volcano <- res_clean %>%
 ribosomal_fill_scale <- scale_fill_identity(
   name   = "Ribosomal Unit",
   guide  = "legend",
-  breaks = c("#8b11a5", "#b074c0", "#7A4CB8", "black"),
+  breaks = c("#ff33ff", "#cc00ff", "#9900ff", "black"),
   labels = c("LSU", "SSU", "both", "unassigned")
 )
 
@@ -558,11 +614,13 @@ make_volcano <- function(contrast_id, title_text) {
 volcano_0_1 <- make_volcano("pr0_pr1", "Day 0 vs Day 1")
 volcano_0_2 <- make_volcano("pr0_pr2", "Day 0 vs Day 2")
 volcano_0_3 <- make_volcano("pr0_pr3", "Day 0 vs Day 3")
+volcano_0_0 <- make_volcano("par_pr0", "Day 0 vs Day 0")
 
 
 plot(volcano_0_1)
 plot(volcano_0_2)
 plot(volcano_0_3)
+plot(volcano_0_0)
 
 ggsave(filename = "volcano_0_1.svg",
        path = plot_dir,
@@ -604,13 +662,6 @@ volcano_faceted <- volcano %>%
     )
   )
 
-ribosomal_fill_scale <- scale_fill_identity(
-  name   = "",
-  guide  = "legend",
-  breaks = c("#8b11a5", "#b074c0", "#7A4CB8", "black"),
-  labels = c("LSU", "SSU", "both", "unassigned")
-)
-
 volcano_facet <- ggplot(
   data = volcano_faceted,
   aes(x = logFC, y = y_var)
@@ -628,7 +679,7 @@ volcano_facet <- ggplot(
   geom_point(
     aes(fill = color),
     shape = 21,
-    size  = 2
+    size  = 3
   ) +
   ribosomal_fill_scale +
   geom_hline(
@@ -655,7 +706,7 @@ volcano_facet <- ggplot(
   theme(
     strip.placement = "outside",
     strip.text.y.left = element_text(angle = 0),  # readable facet labels
-    legend.position = "top")
+    legend.position = "right")
 
 print(volcano_facet)
 
@@ -663,9 +714,9 @@ ggsave(plot = volcano_facet,
        path = plot_dir,
        filename = "volcano_facetted.svg",
        device = "svg",
-       width = 12,
-       height = 22,
-       units = "cm",
+       width = 340/2,
+       height = 401/2,
+       units = "mm",
        )
 ```
 
@@ -812,7 +863,8 @@ fullLength_changed_pub <- res_clean %>%
   filter(FDR <= fdr_cutoff,
          # !grepl("_1", Geneid),
          # !grepl("_2", Geneid),
-         Geneid != "RNA42") %>% 
+         # Geneid != "RNA42"
+         ) %>% 
   separate(contrast, into = c("cond1", "cond2"), sep = "_") %>% 
   mutate(Geneid = base::gsub("_F", "", Geneid),
          logFC = round(logFC, 3),
@@ -872,9 +924,7 @@ polyA_summarised <- polyA_raw %>%
   filter(cumsum <= 0.99,
          n_total >= 25) %>% 
   ungroup() %>% 
-  mutate(condition = base::substr(sample, 1,3),
-         Geneid = base::gsub("/", "-", Geneid),
-         Geneid = base::gsub("_F", "", Geneid)) %>% 
+  mutate(condition = base::substr(sample, 1,3)) %>% 
   group_by(Geneid, polyA, condition) %>% 
   summarise(n_mean = mean(n_rel),
             SEM = sd(n_rel) / sqrt(n())) %>% 
@@ -884,7 +934,11 @@ polyA_summarised <- polyA_raw %>%
            condition == "pr1" ~ "rmRSiC-FLAG 1d ATc",
            condition == "pr2" ~ "rmRSiC-FLAG 2d ATc",
            condition == "pr3" ~ "rmRSiC-FLAG 3d ATc"
-         ))
+         ),
+         Geneid = ifelse(Geneid == "RNA37/38_F", "RNA37-38_F", Geneid))
+
+saveRDS(polyA_summarised,
+        file = "mrsic_polyA.RDS")
 
 for (id in unique(polyA_summarised$Geneid)){
   plot <-
@@ -902,14 +956,14 @@ for (id in unique(polyA_summarised$Geneid)){
          y = "mean relative frequency",
          title = id)
   
-  # png(filename = paste0("plots/polyA/", id, ".png"),
-  #      width = 16,
-  #      height = 9,
-  #      units = "cm",
-  #   res = 400)
-  # plot(plot)
-  # dev.off()  
-  # plot(plot)
+  png(filename = paste0("plots/polyA/", id, ".png"),
+       width = 16,
+       height = 9,
+       units = "cm",
+    res = 400)
+  plot(plot)
+  dev.off()
+  plot(plot)
 }
 
 polyA_summarised_pub <- polyA_raw %>% 
@@ -1047,91 +1101,6 @@ facetted_polyA
     units = "cm",
     )
 
-```
-
-```{r}
-library(dplyr)
-library(kSamples)
-library(tidyr)
-library(tibble)
-library(parallel)
-
-# 1D Wasserstein distance for discrete integer polyA lengths
-wasserstein_discrete <- function(x, y) {
-  all_vals <- sort(unique(c(x, y)))
-  
-  c1 <- tabulate(factor(x, levels = all_vals))
-  c2 <- tabulate(factor(y, levels = all_vals))
-  
-  p1 <- c1 / sum(c1)
-  p2 <- c2 / sum(c2)
-  
-  cdf1 <- cumsum(p1)
-  cdf2 <- cumsum(p2)
-  
-  # step size is 1 nt, so W1 = sum |CDF1 - CDF2|
-  sum(abs(cdf1 - cdf2))
-}
-
-test_polyA <- function(g, n_perm = 1000) {
-  df <- polyA_raw %>%
-    filter(Geneid == g) %>%
-    mutate(condition = substr(sample, 1, 3)) %>%
-    tidyr::uncount(n)  # expanded molecules
-  
-  conds <- unique(df$condition)
-  pairs <- combn(conds, 2, simplify = FALSE)
-  
-  results <- mclapply(pairs, function(p) {
-    # subset for this pair
-    df_pair <- df %>% filter(condition %in% p)
-    
-    x <- df_pair$polyA[df_pair$condition == p[1]]
-    y <- df_pair$polyA[df_pair$condition == p[2]]
-    
-    # Anderson–Darling test
-    ad <- kSamples::ad.test(x, y)
-    p_ad <- ad$ad[1, 3]   # asymptotic p-value (row 1, col 3)
-    
-    # Wasserstein effect size (in nt)
-    w_obs <- wasserstein_discrete(x, y)
-    
-    # Permutation test on Wasserstein
-    labels <- df_pair$condition
-    w_perm <- numeric(n_perm)
-    
-    for (i in seq_len(n_perm)) {
-      shuffled <- sample(labels)
-      x_perm <- df_pair$polyA[shuffled == p[1]]
-      y_perm <- df_pair$polyA[shuffled == p[2]]
-      w_perm[i] <- wasserstein_discrete(x_perm, y_perm)
-    }
-    
-    # one-sided: observed >= permuted
-    p_perm <- (1 + sum(w_perm >= w_obs)) / (n_perm + 1)
-    
-    tibble(
-      Geneid      = g,
-      cond1       = p[1],
-      cond2       = p[2],
-      p_ad        = p_ad,
-      wasserstein = w_obs,
-      p_perm      = p_perm
-    )
-  }, mc.cores = 3)
-  
-  bind_rows(results)
-}
-gc()
-stats_polyA <- bind_rows(mclapply(genes_of_interest, test_polyA, mc.cores = 12)) %>%
-  mutate(
-    p_ad_fdr   = p.adjust(p_ad,   method = "fdr"),
-    p_perm_fdr = p.adjust(p_perm, method = "fdr")
-  )
-
-stats = filter(stats_polyA,
-               wasserstein >= 1,
-               p_perm_fdr <= 0.05)
 ```
 
 ```{r}
@@ -1364,7 +1333,8 @@ tech_w_gene_thresholds <- tech_w %>%
 
 stats_with_baseline <- stats_polyA %>%
   left_join(tech_w_gene_thresholds, by = "Geneid") %>% 
-  filter(wasserstein > p95_w +1,
+  mutate(W_norm = wasserstein / p95_w) %>% 
+  filter(W_norm >= 1.5,
          p_perm_fdr <= 0.05)
 
 stats_polyA_pub <- stats_polyA %>%

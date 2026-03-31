@@ -12,6 +12,34 @@ library(DESeq2)
 library(matrixStats)
 library(vegan)
 
+theme_diss <- function() {
+  theme_bw(base_family = "Liberation Sans") +
+    theme(
+      text = element_text(family = "Liberation Sans", colour = "black"),
+
+      axis.title = element_text(size = 8),
+      axis.text  = element_text(size = 6),
+
+      legend.title = element_text(size = 8, face = "bold"),
+      legend.position = "bottom",
+      legend.direction = "horizontal",
+      legend.text = element_text(size = 6),
+      legend.box.spacing = unit(2, "mm"),
+      legend.key.width = unit(4, "mm"),
+
+      plot.title = element_blank(),   # enforce no titles
+      plot.margin = margin(2, 2, 2, 2, "mm"),
+
+      panel.grid = element_blank(),
+      
+      strip.text = element_text(size = 8, margin = margin(b = 2)),
+      strip.background = element_rect(
+        fill = "grey95",
+        colour = NA
+      )
+    )
+}
+
 ```
 
 ## Normalization of sRNA seq reads
@@ -29,7 +57,7 @@ The broad idea is:
 #TODO - adapt file paths!
 
 ```{r load decoy count data}
-getwd()
+setwd("/media/molgenuser/DATA/Sascha_analyses/HPR4_toxo_srna_pipeline/scripts/R")
 decoyCountFiles <- list.files("../../out/counts/decoy",
                         pattern = "*decoy_featureCounts.txt$",
                         full.names = TRUE)
@@ -74,6 +102,7 @@ colnames(cleanDecoyCounts) <- base::gsub("\\.",
 
 ```{r}
 testplot3 <- cleanDecoyCounts %>% 
+  filter(Length <= 200) %>% 
   select(-Length) %>% 
   
   pivot_longer(cols = 2:16,names_to = "con") %>% 
@@ -89,7 +118,44 @@ ggplot(as.data.frame(testplot3),
 base::saveRDS(testplot3,
               "intermediates/absolute_norm_values.RDS")
 ```
+```{r Sanity Plots, echo=FALSE}
+M <- cleanDecoyCounts %>% 
+  select(-Length) %>% 
+  column_to_rownames("Geneid") %>% 
+  as.matrix()
+  # features x samples
 
+# PCA on ALL decoys (sanity)
+pca <- prcomp(t(M), scale. = FALSE)
+ve <- round(100 * (pca$sdev^2 / sum(pca$sdev^2)), 1)
+autoplot <- function(pc, col) {
+  df <- data.frame(pc$x[,1:2], group = coldata[[col]])
+  ggplot(df, aes(PC1, PC2, shape = group)) +
+  geom_point(size = 1, color = "#009E73FF") +
+  guides(shape = guide_legend(nrow = 1)) +
+  labs(
+    x = paste0("PC1 (", ve[1], "%)"),
+    y = paste0("PC2 (", ve[2], "%)")
+  ) +
+  theme_diss() +
+    # theme(legend.position = "none") +
+    coord_equal()
+}
+
+p1 <- autoplot(pca, "con")
+```
+
+```{r, echo=FALSE, fig.width=4}
+p1
+
+ggsave(
+  "~/diss_plots/mrsic_stable_PCA.svg",
+    plot = p1,
+  device = "svg",
+  width = 155/2,
+  height = 115/2,
+  units = "mm" )
+```
 
 ## Investigate stable genes  
 Based on a simple, preliminary normalization and subsequent calculation of log2 fold changes, stable genes are selected from the decoy dataset: lowest 60% of absolute LFCs. alternatively filter by absolute values, depending on numbers.

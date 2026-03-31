@@ -69,6 +69,7 @@ samples_df = pd.read_csv(config['samples_csv'])
 sample_names = list(samples_df['sample'])
 
 # Define rule all to specify final output files
+# Define rule all to specify final output files
 rule all:
     input:
         # === Sorting and Indexing ===
@@ -83,7 +84,7 @@ rule all:
         mito_bed_minus = expand("out/filtered/strand_cov/{sample}_mito_filtered_minus.bedgraph", sample=sample_names),
 
         # === Start and End Positions ===
-        mito_read_start_end = expand("out/filtered/strand_cov/{sample}_mito_filtered_read_start_end.bed", sample=sample_names),
+        mito_read_start_end = expand("out/filtered/start_stop/{sample}_mito_filtered_read_start_end.bed", sample=sample_names),
 
         # === Counting ===
         counts_mito_short_sense = expand("out/counts/mito/shortFeatures/sense/{sample}_mito_featureCounts.txt", sample=sample_names),
@@ -94,7 +95,6 @@ rule all:
 
         # === PolyA Analysis ===
         polyAsummary = expand("out/polyA/{sample}_polyA_lengths.tsv", sample=sample_names)
-
 
 rule cutadapt_trim_all:
     input:
@@ -234,31 +234,32 @@ rule start_end_positions:
     input:
         bam = "out/filtered/{sample}_mito_filtered.bam"
     output:
-        reads_start_end = "out/filtered/strand_cov/{sample}_mito_filtered_read_start_end.bed"
+        reads_start_end = "out/filtered/start_stop/{sample}_mito_filtered_read_start_end.bed"
     shell:
         r"""
         bedtools bamtobed -split -i {input.bam} \
-            | awk 'BEGIN{OFS="\t"}
-            {
-            if ($6 == "+") {
+            | awk 'BEGIN{{OFS="\t"}}
+            {{
+                if ($6 == "+") {{
                 s = $2 + 1; e = $3
-            } else {
+                }} else {{
                 s = $3;     e = $2 + 1
-            }
-            start[$1 FS s FS $6]++
-            end[$1 FS e FS $6]++
-            }
-            END {
-            for (k in start) {
+                }}
+                start[$1 FS s FS $6]++
+                end[$1 FS e FS $6]++
+            }}
+            END {{
+                for (k in start) {{
                 split(k, a, FS)
                 print a[1], a[2], start[k], a[3], "start"
-            }
-            for (k in end) {
+                }}
+                for (k in end) {{
                 split(k, a, FS)
                 print a[1], a[2], end[k], a[3], "end"
-            }
-            }' > {output.reads_start_end}
+                }}
+            }}' > {output.reads_start_end}
         """
+
 
 rule featurecounts_mito_short_antisense:
     input:
@@ -266,7 +267,6 @@ rule featurecounts_mito_short_antisense:
     output:
         tsv = "out/counts/mito/shortFeatures/antisense/{sample}_mito_featureCounts.txt",
         sum = "out/counts/mito/shortFeatures/antisense/{sample}_mito_featureCounts.txt.summary"
-        rep = "out/counts/mito/shortFeatures/sense/{sample}_mito_filtered.bam.featureCounts"
     threads: 8
     params:
         stranded = 2, feature = "rRNA", attr = "rRNA_id"
@@ -320,7 +320,8 @@ rule featurecounts_mito_short_sense:
         bam = "out/filtered/{sample}_mito_filtered.bam"
     output:
         tsv = "out/counts/mito/shortFeatures/sense/{sample}_mito_featureCounts.txt",
-        sum = "out/counts/mito/shortFeatures/sense/{sample}_mito_featureCounts.txt.summary"
+        sum = "out/counts/mito/shortFeatures/sense/{sample}_mito_featureCounts.txt.summary",
+        rep = "out/counts/mito/shortFeatures/sense/{sample}_mito_filtered.bam.featureCounts"
     threads: 8
     params:
         stranded = 1, feature = "rRNA", attr = "rRNA_id"
